@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>냥골 던전 숙제 및 보상 트래커</title>
-    <!-- 귀여운 스파클(✨) 파비콘 (Base64 인코딩된 SVG) -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>" />
+    <title>?κ낏 ?섏쟾 ?숈젣 諛?蹂댁긽 ?몃옒而?/title>
+    <!-- 洹?ъ슫 ?ㅽ뙆???? ?뚮퉬肄?(Base64 ?몄퐫?⑸맂 SVG) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>??/text></svg>" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         // --- Global Constants and Initialization ---
@@ -128,7 +128,7 @@
 
             const toggleButton = document.getElementById('layout-edit-toggle');
             if (toggleButton) {
-                toggleButton.textContent = enabled ? '레이아웃 완료' : '레이아웃 편집';
+                toggleButton.textContent = enabled ? '?덉씠?꾩썐 ?꾨즺' : '?덉씠?꾩썐 ?몄쭛';
             }
         };
 
@@ -136,9 +136,9 @@
             const nextMode = !isLayoutEditMode;
             setLayoutEditMode(nextMode);
             if (nextMode) {
-                showNotification("섹션 드래그 편집 모드가 켜졌습니다.", 'info');
+                showNotification("?뱀뀡 ?쒕옒洹??몄쭛 紐⑤뱶媛 耳쒖죱?듬땲??", 'info');
             } else {
-                showNotification("레이아웃 변경 내용이 저장되었습니다.", 'success');
+                showNotification("?덉씠?꾩썐 蹂寃??댁슜????λ릺?덉뒿?덈떎.", 'success');
             }
         };
 
@@ -189,7 +189,7 @@
             }
 
             // Update user info area
-            document.getElementById('user-info').textContent = '데이터는 이 웹 브라우저에만 저장됩니다.';
+            document.getElementById('user-info').textContent = '?곗씠?곕뒗 ????釉뚮씪?곗??먮쭔 ??λ맗?덈떎.';
             renderCharacters(); // Initial render for tracker view
             loadPrices(); // Load item prices
         };
@@ -243,14 +243,14 @@
             if (theme === 'light') {
                 body.classList.add('light-theme');
                 if (toggleButton) {
-                    toggleButton.innerHTML = '🌙'; // Dark mode icon
-                    toggleButton.title = '다크 모드로 전환';
+                    toggleButton.innerHTML = '?뙔'; // Dark mode icon
+                    toggleButton.title = '?ㅽ겕 紐⑤뱶濡??꾪솚';
                 }
             } else { // dark
                 body.classList.remove('light-theme');
                 if (toggleButton) {
-                    toggleButton.innerHTML = '☀️'; // Light mode icon
-                    toggleButton.title = '라이트 모드로 전환';
+                    toggleButton.innerHTML = '?截?; // Light mode icon
+                    toggleButton.title = '?쇱씠??紐⑤뱶濡??꾪솚';
                 }
             }
             localStorage.setItem(THEME_KEY, theme);
@@ -283,7 +283,7 @@
                 if (layoutEditButton && layoutEditButton.parentElement) {
                     layoutEditButton.parentElement.classList.add('hidden');
                 }
-                toggleButton.textContent = '🏠 트래커 돌아가기';
+                toggleButton.textContent = '?룧 ?몃옒而??뚯븘媛湲?;
                 toggleButton.onclick = () => switchView('tracker');
                 renderSettlement(); // Render the content immediately
             } else { // 'tracker'
@@ -292,7 +292,7 @@
                 if (layoutEditButton && layoutEditButton.parentElement) {
                     layoutEditButton.parentElement.classList.remove('hidden');
                 }
-                toggleButton.textContent = '💰 정산표 보기';
+                toggleButton.textContent = '?뮥 ?뺤궛??蹂닿린';
                 toggleButton.onclick = () => switchView('settlement');
                 renderCharacters(); // Re-render the tracker list
             }
@@ -309,7 +309,7 @@
             characterListDiv.innerHTML = ''; // Clear existing list
 
             if (characters.length === 0) {
-                characterListDiv.innerHTML = '<p class="text-subtle-theme p-4 text-center">아직 등록된 캐릭터가 없습니다. 새 캐릭터를 추가해 보세요!</p>';
+                characterListDiv.innerHTML = '<p class="text-subtle-theme p-4 text-center">?꾩쭅 ?깅줉??罹먮┃?곌? ?놁뒿?덈떎. ??罹먮┃?곕? 異붽???蹂댁꽭??</p>';
                 return;
             }
 
@@ -373,16 +373,16 @@
             // Note: Relying on browser default checkmark and Tailwind's ability to style the box.
             checkbox.className = 'h-6 w-6 text-green-500 bg-secondary-theme border-2 border-theme rounded-lg focus:ring-green-500 cursor-pointer flex-shrink-0'; 
             checkbox.checked = data.isCompleted;
-            checkbox.title = '숙제 완료 체크';
+            checkbox.title = '?숈젣 ?꾨즺 泥댄겕';
             checkbox.onchange = () => toggleCompletion(charId);
 
             // Pin Button
             const pinButton = document.createElement('button');
-            const pinIcon = data.isPinned ? '📌' : '📍'; 
+            const pinIcon = data.isPinned ? '?뱦' : '?뱧'; 
             const pinColorClass = data.isPinned ? 'text-pin-highlight' : 'text-subtle-theme hover:text-pin-highlight';
             pinButton.className = `p-1 rounded-full text-lg transition duration-150 ${pinColorClass}`;
             pinButton.innerHTML = pinIcon;
-            pinButton.title = data.isPinned ? '고정 해제' : '상단 고정';
+            pinButton.title = data.isPinned ? '怨좎젙 ?댁젣' : '?곷떒 怨좎젙';
             pinButton.onclick = (e) => {
                 e.stopPropagation(); 
                 togglePin(charId);
@@ -398,7 +398,7 @@
 
             const idSpan = document.createElement('span');
             idSpan.className = 'text-xs text-subtle-theme mt-1';
-            idSpan.textContent = `순번: ${idx+1}`;
+            idSpan.textContent = `?쒕쾲: ${idx+1}`;
 
             nameControls.appendChild(checkbox);
             nameControls.appendChild(pinButton);
@@ -409,7 +409,7 @@
 
             // 2. Weekly Count Section (FEATURE 1 usage)
             const weeklySection = createCounterSection(
-                '주간 냥골',
+                '二쇨컙 ?κ낏',
                 data.weeklyCount,
                 'weeklyCount',
                 charId,
@@ -418,7 +418,7 @@
 
             // 3. Monthly Count Section (Uses default accent color)
             const monthlySection = createCounterSection(
-                '월간 냥골',
+                '?붽컙 ?κ낏',
                 data.monthlyCount,
                 'monthlyCount',
                 charId,
@@ -433,26 +433,22 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
             `;
-            deleteButton.title = `${data.name} 캐릭터 삭제`;
+            deleteButton.title = `${data.name} 罹먮┃????젣`;
             deleteButton.onclick = () => deleteCharacter(charId, data.name);
             
+            if (isWeeklyGoalReached) {
+                weeklySection.appendChild(createGoalCelebrationLayer('주간 완료', 'weekly'));
+            }
+            if (isMonthlyGoalReached) {
+                const monthlyLabel = isWeeklyGoalReached ? '주간/월간 완료' : '월간 완료';
+                monthlySection.appendChild(createGoalCelebrationLayer(monthlyLabel, 'monthly'));
+            }
+
             // Combine all sections
             card.appendChild(nameSection);
             card.appendChild(weeklySection);
             card.appendChild(monthlySection);
             card.appendChild(deleteButton);
-            if (isGoalReached) {
-                let goalLabel = '주간 완료';
-                let effectMode = 'weekly';
-                if (isWeeklyGoalReached && isMonthlyGoalReached) {
-                    goalLabel = '주간/월간 완료';
-                    effectMode = 'monthly';
-                } else if (isMonthlyGoalReached) {
-                    goalLabel = '월간 완료';
-                    effectMode = 'monthly';
-                }
-                card.appendChild(createGoalCelebrationLayer(goalLabel, effectMode));
-            }
 
             return card;
         };
@@ -481,7 +477,7 @@
                                 '--row-y': `${rowY}px`,
                                 '--delay': `${(coinIndex * 0.08) + (rowIndex * 0.14)}s`
                             },
-                            '₩'
+                            '??
                         )
                     );
                 });
@@ -518,21 +514,21 @@
             const decrementBtn = document.createElement('button');
             decrementBtn.className = 'w-10 h-10 bg-gray-600 text-white rounded-full text-2xl font-bold transition hover:opacity-80 shadow-md';
             decrementBtn.textContent = '-';
-            decrementBtn.title = '카운트 1 감소 (길게 누르면 반복)';
+            decrementBtn.title = '移댁슫??1 媛먯냼 (湲멸쾶 ?꾨Ⅴ硫?諛섎났)';
             setupCounterEvents(decrementBtn, charId, fieldName, 'decrement'); 
 
             // Increment Button
             const incrementBtn = document.createElement('button');
             incrementBtn.className = 'w-10 h-10 bg-accent-blue text-white rounded-full text-2xl font-bold transition hover:opacity-80 shadow-md';
             incrementBtn.textContent = '+';
-            incrementBtn.title = '카운트 1 증가 (길게 누르면 반복)';
+            incrementBtn.title = '移댁슫??1 利앷? (湲멸쾶 ?꾨Ⅴ硫?諛섎났)';
             setupCounterEvents(incrementBtn, charId, fieldName, 'increment'); 
 
             // Individual Reset Button (Retains simple click behavior)
             const resetIndividualBtn = document.createElement('button');
             resetIndividualBtn.className = 'w-10 h-10 bg-gray-700 text-white rounded-full text-xl font-bold transition hover:opacity-80 shadow-md';
-            resetIndividualBtn.innerHTML = '&#128472;'; // 🔄 Unicode
-            resetIndividualBtn.title = `${title} 카운트 0으로 초기화`;
+            resetIndividualBtn.innerHTML = '&#128472;'; // ?봽 Unicode
+            resetIndividualBtn.title = `${title} 移댁슫??0?쇰줈 珥덇린??;
             resetIndividualBtn.onclick = () => handleCountAction(charId, fieldName, 'reset');
 
 
@@ -603,23 +599,23 @@
                     
                     <!-- 1. Price Input Section -->
                     <div class="bg-primary-theme p-6 rounded-xl shadow-inner border border-theme">
-                        <h3 class="text-xl font-bold mb-4 text-accent-blue">💰 아이템 현재 가격 입력</h3>
+                        <h3 class="text-xl font-bold mb-4 text-accent-blue">?뮥 ?꾩씠???꾩옱 媛寃??낅젰</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <!-- 봉힘파 가격 -->
+                            <!-- 遊됲옒??媛寃?-->
                             <div class="flex flex-col">
-                                <label for="fragment-price" class="text-subtle-theme text-sm font-medium mb-1">봉인된 힘의 파편 (봉힘파) 개당 가격 (골드)</label>
+                                <label for="fragment-price" class="text-subtle-theme text-sm font-medium mb-1">遊됱씤???섏쓽 ?뚰렪 (遊됲옒?? 媛쒕떦 媛寃?(怨⑤뱶)</label>
                                 <input type="number" id="fragment-price"
                                     value="${itemPrices.fragmentPrice}" min="0" step="1000"
-                                    placeholder="봉힘파 개당 가격"
+                                    placeholder="遊됲옒??媛쒕떦 媛寃?
                                     class="theme-input p-3 rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none text-xl font-bold"
                                     oninput="handlePriceChange('fragmentPrice', this.value)">
                             </div>
-                            <!-- 고강비 가격 -->
+                            <!-- 怨좉컯鍮?媛寃?-->
                             <div class="flex flex-col">
-                                <label for="feather-price" class="text-subtle-theme text-sm font-medium mb-1">고급 강화의 비약 (고강비) 개당 가격 (골드)</label>
+                                <label for="feather-price" class="text-subtle-theme text-sm font-medium mb-1">怨좉툒 媛뺥솕??鍮꾩빟 (怨좉컯鍮? 媛쒕떦 媛寃?(怨⑤뱶)</label>
                                 <input type="number" id="feather-price"
                                     value="${itemPrices.featherPrice}" min="0" step="1000"
-                                    placeholder="고강비 개당 가격"
+                                    placeholder="怨좉컯鍮?媛쒕떦 媛寃?
                                     class="theme-input p-3 rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none text-xl font-bold"
                                     oninput="handlePriceChange('featherPrice', this.value)">
                             </div>
@@ -628,52 +624,52 @@
                     
                     <!-- 2. Total Reward Summary -->
                     <div class="bg-secondary-theme p-6 rounded-xl shadow-lg border border-theme">
-                        <h3 class="text-2xl font-bold mb-4">🏆 전체 정산 결과</h3>
+                        <h3 class="text-2xl font-bold mb-4">?룇 ?꾩껜 ?뺤궛 寃곌낵</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                             
-                            <!-- 총 봉힘파 -->
+                            <!-- 珥?遊됲옒??-->
                             <div class="p-4 bg-primary-theme rounded-lg border border-theme">
-                                <p class="text-subtle-theme text-sm">총 봉힘파 수량</p>
-                                <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalFragments)}개</p>
+                                <p class="text-subtle-theme text-sm">珥?遊됲옒???섎웾</p>
+                                <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalFragments)}媛?/p>
                             </div>
 
-                            <!-- 총 고강비 -->
+                            <!-- 珥?怨좉컯鍮?-->
                             <div class="p-4 bg-primary-theme rounded-lg border border-theme">
-                                <p class="text-subtle-theme text-sm">총 고강비 수량</p>
-                                <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalFeathers)}개</p>
+                                <p class="text-subtle-theme text-sm">珥?怨좉컯鍮??섎웾</p>
+                                <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalFeathers)}媛?/p>
                             </div>
 
-                            <!-- 총 골드 가치 -->
+                            <!-- 珥?怨⑤뱶 媛移?-->
                             <div class="p-4 bg-primary-theme rounded-lg border border-theme col-span-1 sm:col-span-1">
-                                <p class="text-subtle-theme text-sm">총 예상 골드 가치</p>
+                                <p class="text-subtle-theme text-sm">珥??덉긽 怨⑤뱶 媛移?/p>
                                 <p class="text-3xl font-extrabold text-green-500">${formatNumber(rewards.totalGold)}G</p>
                             </div>
                         </div>
-                        <p class="text-xs text-subtle-theme mt-4">* 이 금액은 입력된 아이템 가격에 기반한 예상치입니다.</p>
+                        <p class="text-xs text-subtle-theme mt-4">* ??湲덉븸? ?낅젰???꾩씠??媛寃⑹뿉 湲곕컲???덉긽移섏엯?덈떎.</p>
                     </div>
 
                     <!-- 3. Character Breakdown Table -->
                     <div class="bg-primary-theme p-6 rounded-xl shadow-lg border border-theme">
-                        <h3 class="text-2xl font-bold mb-4">캐릭터별 상세 정산</h3>
+                        <h3 class="text-2xl font-bold mb-4">罹먮┃?곕퀎 ?곸꽭 ?뺤궛</h3>
                         
                         ${rewards.rewardPerCharacter.length > 0 ? `
                         <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-theme">
                                 <thead class="bg-secondary-theme">
                                     <tr>
-                                        <th class="px-3 py-3 text-left text-xs font-medium text-subtle-theme uppercase tracking-wider rounded-tl-lg">캐릭터 이름</th>
-                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">주간 정산 횟수</th>
-                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">월간 정산 횟수</th>
-                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">봉힘파 총량</th>
-                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider rounded-tr-lg">고강비 총량</th>
+                                        <th class="px-3 py-3 text-left text-xs font-medium text-subtle-theme uppercase tracking-wider rounded-tl-lg">罹먮┃???대쫫</th>
+                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">二쇨컙 ?뺤궛 ?잛닔</th>
+                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">?붽컙 ?뺤궛 ?잛닔</th>
+                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">遊됲옒??珥앸웾</th>
+                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider rounded-tr-lg">怨좉컯鍮?珥앸웾</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-theme">
                                     ${rewards.rewardPerCharacter.map(char => `
                                         <tr class="hover:bg-secondary-theme transition duration-150">
                                             <td class="px-3 py-4 whitespace-nowrap text-sm font-medium">${char.name}</td>
-                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center">${char.weeklyBatches}회</td>
-                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center">${char.monthlyBatches}회</td>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center">${char.weeklyBatches}??/td>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center">${char.monthlyBatches}??/td>
                                             <td class="px-3 py-4 whitespace-nowrap text-sm text-center font-semibold text-pin-highlight">${formatNumber(char.fragments)}</td>
                                             <td class="px-3 py-4 whitespace-nowrap text-sm text-center font-semibold text-pin-highlight">${formatNumber(char.feathers)}</td>
                                         </tr>
@@ -681,10 +677,10 @@
                                 </tbody>
                             </table>
                         </div>
-                        ` : `<p class="text-subtle-theme text-center p-4">등록된 캐릭터가 없어 정산할 수 없습니다.</p>`}
+                        ` : `<p class="text-subtle-theme text-center p-4">?깅줉??罹먮┃?곌? ?놁뼱 ?뺤궛?????놁뒿?덈떎.</p>`}
 
                         <p class="text-sm text-subtle-theme mt-4">
-                            정산 기준: 주간 10회 = 봉힘파 50 + 고강비 20 / 월간 30회 = 봉힘파 100
+                            ?뺤궛 湲곗?: 二쇨컙 10??= 遊됲옒??50 + 怨좉컯鍮?20 / ?붽컙 30??= 遊됲옒??100
                         </p>
                     </div>
                 </div>
@@ -718,7 +714,7 @@
         const toggleCompletion = (charId) => {
             const charIndex = characters.findIndex(char => char.id === charId);
             if (charIndex === -1) {
-                showNotification("캐릭터 정보를 찾을 수 없습니다.");
+                showNotification("罹먮┃???뺣낫瑜?李얠쓣 ???놁뒿?덈떎.");
                 return;
             }
 
@@ -730,7 +726,7 @@
         const togglePin = (charId) => {
             const charIndex = characters.findIndex(char => char.id === charId);
             if (charIndex === -1) {
-                showNotification("캐릭터 정보를 찾을 수 없습니다.");
+                showNotification("罹먮┃???뺣낫瑜?李얠쓣 ???놁뒿?덈떎.");
                 return;
             }
 
@@ -739,7 +735,7 @@
             reindexCharacters(); 
             
             saveToLocalStorage();
-            showNotification(isPinning ? `'${characters[charIndex].name}'을(를) 상단에 고정했습니다.` : `'${characters[charIndex].name}' 고정을 해제했습니다.`, 'info');
+            showNotification(isPinning ? `'${characters[charIndex].name}'??瑜? ?곷떒??怨좎젙?덉뒿?덈떎.` : `'${characters[charIndex].name}' 怨좎젙???댁젣?덉뒿?덈떎.`, 'info');
         };
 
         const handleCountAction = (charId, fieldName, action) => {
@@ -763,7 +759,7 @@
                     if (data.monthlyCount < MONTHLY_CAP) {
                         data.monthlyCount = Math.min(data.monthlyCount + 1, MONTHLY_CAP);
                     } else if (data.monthlyCount === MONTHLY_CAP && data.weeklyCount === 1) {
-                        showNotification(`월간 냥골 카운트가 최대치(${MONTHLY_CAP})에 도달했습니다.`, 'info');
+                        showNotification(`?붽컙 ?κ낏 移댁슫?멸? 理쒕?移?${MONTHLY_CAP})???꾨떖?덉뒿?덈떎.`, 'info');
                     }
                 } else if (action === 'decrement') { 
                     if (data.weeklyCount > 0) {
@@ -789,7 +785,7 @@
                         updated = true;
 
                         if (newMonthlyCount === MONTHLY_CAP) {
-                            showNotification(`월간 냥골 카운트가 최대치(${MONTHLY_CAP})에 도달했습니다.`, 'info');
+                            showNotification(`?붽컙 ?κ낏 移댁슫?멸? 理쒕?移?${MONTHLY_CAP})???꾨떖?덉뒿?덈떎.`, 'info');
                         }
                     }
                 } else if (action === 'decrement') { 
@@ -807,12 +803,12 @@
 
             if (updated) {
                 if (previousWeeklyCount < REWARD_RULES.weekly.divisor && data.weeklyCount >= REWARD_RULES.weekly.divisor) {
-                    showNotification(`${data.name} 주간 냥골 숙제가 완료되었습니다!`, 'success');
+                    showNotification(`${data.name} 二쇨컙 ?κ낏 ?숈젣媛 ?꾨즺?섏뿀?듬땲??`, 'success');
                 }
                 if (previousMonthlyCount < REWARD_RULES.monthly.divisor && data.monthlyCount >= REWARD_RULES.monthly.divisor) {
                     const monthlyDoneMessage = data.weeklyCount >= REWARD_RULES.weekly.divisor
-                        ? `${data.name} 주간/월간 냥골 숙제가 완료되었습니다!`
-                        : `${data.name} 월간 냥골 숙제가 완료되었습니다!`;
+                        ? `${data.name} 二쇨컙/?붽컙 ?κ낏 ?숈젣媛 ?꾨즺?섏뿀?듬땲??`
+                        : `${data.name} ?붽컙 ?κ낏 ?숈젣媛 ?꾨즺?섏뿀?듬땲??`;
                     showNotification(monthlyDoneMessage, 'success');
                 }
                 saveToLocalStorage(); 
@@ -820,7 +816,7 @@
         };
 
         const deleteCharacter = async (charId, charName) => {
-            const confirmed = await window.confirm(`정말로 캐릭터 '${charName}'을(를) 삭제하시겠습니까?`);
+            const confirmed = await window.confirm(`?뺣쭚濡?罹먮┃??'${charName}'??瑜? ??젣?섏떆寃좎뒿?덇퉴?`);
             if (!confirmed) {
                 return;
             }
@@ -830,22 +826,22 @@
 
             if (characters.length < initialLength) {
                 saveToLocalStorage(); // Reindexes and saves
-                showNotification(`캐릭터 '${charName}'이(가) 삭제되었습니다.`, 'success');
+                showNotification(`罹먮┃??'${charName}'??媛) ??젣?섏뿀?듬땲??`, 'success');
             } else {
-                showNotification("캐릭터 삭제에 실패했습니다.", 'error');
+                showNotification("罹먮┃????젣???ㅽ뙣?덉뒿?덈떎.", 'error');
             }
         };
         
         // Resets only weekly/monthly counts for all characters.
         const resetAllData = async () => {
-            const confirmed = await window.confirm("경고: 모든 캐릭터의 주간/월간 냥골 카운트가 0으로 초기화됩니다. 계속하시겠습니까?");
+            const confirmed = await window.confirm("寃쎄퀬: 紐⑤뱺 罹먮┃?곗쓽 二쇨컙/?붽컙 ?κ낏 移댁슫?멸? 0?쇰줈 珥덇린?붾맗?덈떎. 怨꾩냽?섏떆寃좎뒿?덇퉴?");
             
             if (!confirmed) {
                 return;
             }
 
             if (characters.length === 0) {
-                showNotification("초기화할 캐릭터가 없습니다.", 'info');
+                showNotification("珥덇린?뷀븷 罹먮┃?곌? ?놁뒿?덈떎.", 'info');
                 return;
             }
             
@@ -856,7 +852,7 @@
             }));
 
             saveToLocalStorage(); 
-            showNotification("모든 캐릭터의 냥골 카운트가 초기화되었습니다.", 'success');
+            showNotification("紐⑤뱺 罹먮┃?곗쓽 ?κ낏 移댁슫?멸? 珥덇린?붾릺?덉뒿?덈떎.", 'success');
         };
 
         // --- Drag and Drop Handlers ---
@@ -927,7 +923,7 @@
             characters = newCharacters;
             saveToLocalStorage();
             
-            showNotification("캐릭터 순서가 드래그 앤 드롭으로 변경되었습니다.", 'info');
+            showNotification("罹먮┃???쒖꽌媛 ?쒕옒洹????쒕∼?쇰줈 蹂寃쎈릺?덉뒿?덈떎.", 'info');
         };
         // --- End Drag and Drop Handlers ---
 
@@ -977,7 +973,7 @@
             e.preventDefault();
             if (!draggedSectionElement) return;
             syncTrackerLayoutOrder();
-            showNotification("트래커 섹션 순서가 저장되었습니다.", 'info');
+            showNotification("?몃옒而??뱀뀡 ?쒖꽌媛 ??λ릺?덉뒿?덈떎.", 'info');
         };
         // --- End Layout Section Drag and Drop Handlers ---
 
@@ -1042,7 +1038,7 @@
                 section.addEventListener('dragend', handleSectionDragEnd);
             });
 
-            // 메모 입력 이벤트 리스너 설정
+            // 硫붾え ?낅젰 ?대깽??由ъ뒪???ㅼ젙
             const memoInput = document.getElementById('memo-input');
             if (memoInput) {
                 memoInput.addEventListener('input', () => {
@@ -1059,14 +1055,13 @@
                 if (name) {
                     addCharacter(name);
                     nameInput.value = ''; // Clear input
-                    showNotification(`'${name}' 캐릭터가 추가되었습니다.`, 'success');
+                    showNotification(`'${name}' 罹먮┃?곌? 異붽??섏뿀?듬땲??`, 'success');
                 } else {
-                    showNotification("캐릭터 이름을 입력해주세요.");
+                    showNotification("罹먮┃???대쫫???낅젰?댁＜?몄슂.");
                 }
             });
             
-            // 전체 초기화 버튼 이벤트 리스너
-            const resetButton = document.getElementById('reset-all-button');
+            // ?꾩껜 珥덇린??踰꾪듉 ?대깽??由ъ뒪??            const resetButton = document.getElementById('reset-all-button');
             if (resetButton) {
                 resetButton.addEventListener('click', resetAllData);
             }
@@ -1264,6 +1259,10 @@
             pointer-events: none;
             z-index: 1;
         }
+        .counter-section {
+            position: relative;
+            overflow: visible;
+        }
         .goal-celebration .goal-badge {
             position: absolute;
             top: 10px;
@@ -1320,8 +1319,8 @@
         <div class="bg-secondary-theme p-6 rounded-xl shadow-2xl max-w-sm w-full border border-theme">
             <p id="modal-message" class="text-lg font-semibold mb-6"></p>
             <div class="flex justify-end space-x-3">
-                <button id="modal-cancel" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition shadow-md">취소</button>
-                <button id="modal-confirm" class="px-4 py-2 bg-accent-red text-white rounded-lg hover:bg-red-600 transition shadow-md">확인</button>
+                <button id="modal-cancel" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition shadow-md">痍⑥냼</button>
+                <button id="modal-confirm" class="px-4 py-2 bg-accent-red text-white rounded-lg hover:bg-red-600 transition shadow-md">?뺤씤</button>
             </div>
         </div>
     </div>
@@ -1339,30 +1338,30 @@
             <!-- View Toggle Button (NEW) -->
             <button id="view-toggle-button" onclick="switchView('settlement')" 
                     class="order-2 sm:order-1 mt-4 sm:mt-0 px-4 py-2 bg-accent-blue text-white font-semibold rounded-lg hover:opacity-80 transition shadow-lg w-full sm:w-auto text-sm">
-                💰 정산표 보기
+                ?뮥 ?뺤궛??蹂닿린
             </button>
 
             <div class="text-center order-1 sm:order-2">
-                <h1 class="text-4xl font-extrabold text-accent-blue mb-2">냥골 던전 숙제 트래커</h1>
-                <p class="text-subtle-theme">캐릭터별 주간/월간 클리어 횟수 및 보상 정산</p>
+                <h1 class="text-4xl font-extrabold text-accent-blue mb-2">?κ낏 ?섏쟾 ?숈젣 ?몃옒而?/h1>
+                <p class="text-subtle-theme">罹먮┃?곕퀎 二쇨컙/?붽컙 ?대━???잛닔 諛?蹂댁긽 ?뺤궛</p>
             </div>
             
             <!-- Theme Toggle Button -->
-            <button id="theme-toggle" onclick="toggleTheme()" class="order-3 absolute top-0 right-0 sm:static p-2 rounded-full bg-secondary-theme hover:opacity-80 transition shadow-lg text-2xl" title="테마 전환">
-                <span id="theme-icon">☀️</span>
+            <button id="theme-toggle" onclick="toggleTheme()" class="order-3 absolute top-0 right-0 sm:static p-2 rounded-full bg-secondary-theme hover:opacity-80 transition shadow-lg text-2xl" title="?뚮쭏 ?꾪솚">
+                <span id="theme-icon">?截?/span>
             </button>
         </header>
         <div class="mb-4 flex justify-end">
             <button id="layout-edit-toggle" onclick="toggleLayoutEditMode()"
                     class="px-4 py-2 bg-primary-theme border border-theme rounded-lg text-sm font-semibold hover:opacity-80 transition">
-                레이아웃 편집
+                ?덉씠?꾩썐 ?몄쭛
             </button>
         </div>
 
         <!-- User Info & Disclaimer -->
         <div class="mb-6 bg-primary-theme p-4 rounded-xl shadow border border-theme">
-            <p id="user-info" class="text-sm text-subtle-theme">데이터를 로드 중입니다...</p>
-            <p class="text-xs text-blue-500 mt-1">※ 데이터는 현재 브라우저의 로컬 저장소에 저장되므로, 다른 브라우저에서는 접근할 수 없습니다.</p>
+            <p id="user-info" class="text-sm text-subtle-theme">?곗씠?곕? 濡쒕뱶 以묒엯?덈떎...</p>
+            <p class="text-xs text-blue-500 mt-1">???곗씠?곕뒗 ?꾩옱 釉뚮씪?곗???濡쒖뺄 ??μ냼????λ릺誘濡? ?ㅻⅨ 釉뚮씪?곗??먯꽌???묎렐?????놁뒿?덈떎.</p>
         </div>
         
         <!-- --- TRACKER VIEW CONTENT --- -->
@@ -1371,44 +1370,44 @@
             <!-- Memo Section (Collapsible) -->
             <details class="layout-section mb-8 p-6 bg-secondary-theme rounded-xl shadow-lg border border-theme" data-section-id="memo">
                 <summary class="text-2xl font-bold cursor-pointer select-none">
-                    📝 메모/자유 기록 (여기를 클릭하여 열고 닫기)
+                    ?뱷 硫붾え/?먯쑀 湲곕줉 (?ш린瑜??대┃?섏뿬 ?닿퀬 ?リ린)
                 </summary>
                 <textarea id="memo-input" 
                             class="theme-input w-full h-32 mt-4 p-3 border rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none"
-                            placeholder="여기에 자유롭게 메모를 입력하세요. (브라우저에 자동 저장됩니다.)"
+                            placeholder="?ш린???먯쑀濡?쾶 硫붾え瑜??낅젰?섏꽭?? (釉뚮씪?곗????먮룞 ??λ맗?덈떎.)"
                 ></textarea>
             </details>
 
             <!-- Add Character Form -->
             <div class="layout-section mb-8 p-6 bg-secondary-theme rounded-xl shadow-lg border border-theme" data-section-id="add-character">
-                <h2 class="text-2xl font-bold mb-4">새 캐릭터 추가</h2>
+                <h2 class="text-2xl font-bold mb-4">??罹먮┃??異붽?</h2>
                 <form id="add-char-form" class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
                     <input 
                         type="text" 
                         id="char-name-input" 
-                        placeholder="캐릭터 이름 (예: 사냐)"
+                        placeholder="罹먮┃???대쫫 (?? ?щ깘)"
                         required
                         class="theme-input flex-grow p-3 border rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none"
                     >
                     <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-accent-blue text-white font-semibold rounded-lg hover:bg-blue-600 transition shadow-lg">
-                        캐릭터 추가
+                        罹먮┃??異붽?
                     </button>
                 </form>
             </div>
             
             <!-- Count Reset Section (Compact) -->
             <div class="layout-section mb-8 p-3 bg-primary-theme rounded-xl shadow-lg border border-theme flex flex-col sm:flex-row items-center justify-between" data-section-id="reset">
-                <span class="text-sm font-semibold text-subtle-theme mb-2 sm:mb-0">전체 카운트 초기화 (주간/월간)</span>
+                <span class="text-sm font-semibold text-subtle-theme mb-2 sm:mb-0">?꾩껜 移댁슫??珥덇린??(二쇨컙/?붽컙)</span>
                 <button id="reset-all-button" class="w-full sm:w-auto px-4 py-2 bg-accent-red text-white text-sm font-semibold rounded-lg hover:bg-red-600 transition shadow-lg">
-                    🔄 모두 리셋
+                    ?봽 紐⑤몢 由ъ뀑
                 </button>
             </div>
 
             <!-- Character List -->
             <section class="layout-section" data-section-id="character-list">
-                <h2 class="text-2xl font-bold mb-4 border-b border-theme pb-2">캐릭터 현황 (드래그 앤 드롭으로 순서 변경 가능)</h2>
+                <h2 class="text-2xl font-bold mb-4 border-b border-theme pb-2">罹먮┃???꾪솴 (?쒕옒洹????쒕∼?쇰줈 ?쒖꽌 蹂寃?媛??</h2>
                 <div id="character-list" class="space-y-4">
-                    <p class="text-subtle-theme p-4 text-center">캐릭터 데이터를 로드 중입니다...</p>
+                    <p class="text-subtle-theme p-4 text-center">罹먮┃???곗씠?곕? 濡쒕뱶 以묒엯?덈떎...</p>
                 </div>
             </section>
             </div>
@@ -1416,10 +1415,10 @@
         
         <!-- --- SETTLEMENT VIEW CONTENT (NEW) --- -->
         <div id="settlement-view" class="hidden">
-            <h2 class="text-3xl font-extrabold mb-6 border-b border-theme pb-2 text-blue">💰 보상 정산표</h2>
+            <h2 class="text-3xl font-extrabold mb-6 border-b border-theme pb-2 text-blue">?뮥 蹂댁긽 ?뺤궛??/h2>
             <div id="settlement-content">
                 <!-- Settlement details will be rendered here by renderSettlement() -->
-                <p class="text-subtle-theme p-4 text-center">정산표 데이터를 로드 중입니다...</p>
+                <p class="text-subtle-theme p-4 text-center">?뺤궛???곗씠?곕? 濡쒕뱶 以묒엯?덈떎...</p>
             </div>
         </div>
 
