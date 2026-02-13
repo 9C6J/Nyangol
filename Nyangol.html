@@ -16,6 +16,7 @@
         const MEMO_KEY = 'nyangolMemoContent';
         const THEME_KEY = 'nyangolTheme';
         const PRICE_KEY = 'nyangolItemPrices'; // Price storage key
+        const LAYOUT_KEY = 'nyangolLayoutV1';
 
         // Reward Rules
         const REWARD_RULES = {
@@ -23,14 +24,31 @@
             monthly: { divisor: 30, fragments: 100 }
         };
         const DEFAULT_PRICES = { fragmentPrice: 68000, featherPrice: 100000 };
+        const ANIMATION_THEMES = {
+            warrior: { label: '전사형' },
+            mage: { label: '마법형' },
+            archer: { label: '궁수형' },
+            rogue: { label: '도적형' },
+            healer: { label: '힐러형' }
+        };
+        const ANIMATION_THEME_KEYS = Object.keys(ANIMATION_THEMES);
+        const ANIMATION_THEME_HELP_TEXT = ANIMATION_THEME_KEYS
+            .map((key, index) => `${index + 1}. ${ANIMATION_THEMES[key].label} (${key})`)
+            .join('\n');
+
+        const normalizeAnimationTheme = (theme) => {
+            return Object.prototype.hasOwnProperty.call(ANIMATION_THEMES, theme) ? theme : 'warrior';
+        };
 
         // Global State
         let characters = [];
         let itemPrices = DEFAULT_PRICES;
         let currentView = 'tracker';
+        let isLayoutEditMode = false;
 
         // Drag and Drop Globals
         let draggedElement = null; 
+        let draggedSectionElement = null;
 
         // Repeat/Hold Logic Globals
         let repeatTimer = null;
@@ -50,6 +68,93 @@
         // Finds the closest parent card element
         const getCardElement = (target) => {
             return target.closest('.character-card');
+        };
+        const getLayoutSectionElement = (target) => {
+            return target.closest('.layout-section');
+        };
+
+        const loadLayoutState = () => {
+            const fallback = { trackerOrder: [] };
+            const raw = localStorage.getItem(LAYOUT_KEY);
+            if (!raw) return fallback;
+            try {
+                const parsed = JSON.parse(raw);
+                if (!Array.isArray(parsed.trackerOrder)) return fallback;
+                return parsed;
+            } catch (e) {
+                console.error("Error parsing layout data:", e);
+                return fallback;
+            }
+        };
+
+        const saveLayoutState = (trackerOrder) => {
+            localStorage.setItem(LAYOUT_KEY, JSON.stringify({ trackerOrder }));
+        };
+
+        const applyTrackerLayout = () => {
+            const trackerSections = document.getElementById('tracker-sections');
+            if (!trackerSections) return;
+
+            const layout = loadLayoutState();
+            const sectionMap = {};
+            const sections = Array.from(trackerSections.querySelectorAll('.layout-section'));
+            sections.forEach((section) => {
+                sectionMap[section.dataset.sectionId] = section;
+            });
+
+            layout.trackerOrder.forEach((sectionId) => {
+                const section = sectionMap[sectionId];
+                if (section) trackerSections.appendChild(section);
+            });
+
+            sections.forEach((section) => {
+                if (!layout.trackerOrder.includes(section.dataset.sectionId)) {
+                    trackerSections.appendChild(section);
+                }
+            });
+        };
+
+        const syncTrackerLayoutOrder = () => {
+            const trackerSections = document.getElementById('tracker-sections');
+            if (!trackerSections) return;
+            const order = Array.from(trackerSections.querySelectorAll('.layout-section'))
+                .map((section) => section.dataset.sectionId)
+                .filter(Boolean);
+            saveLayoutState(order);
+        };
+
+        const updateLayoutSectionDraggableState = () => {
+            const sections = document.querySelectorAll('.layout-section');
+            sections.forEach((section) => {
+                section.setAttribute('draggable', isLayoutEditMode ? 'true' : 'false');
+            });
+        };
+
+        const setLayoutEditMode = (enabled) => {
+            const wasEnabled = isLayoutEditMode;
+            if (wasEnabled && !enabled) {
+                syncTrackerLayoutOrder();
+            }
+
+            isLayoutEditMode = enabled;
+            document.body.classList.toggle('layout-edit-mode', enabled);
+            updateLayoutSectionDraggableState();
+            renderCharacters();
+
+            const toggleButton = document.getElementById('layout-edit-toggle');
+            if (toggleButton) {
+                toggleButton.textContent = enabled ? '레이아웃 완료' : '레이아웃 편집';
+            }
+        };
+
+        window.toggleLayoutEditMode = () => {
+            const nextMode = !isLayoutEditMode;
+            setLayoutEditMode(nextMode);
+            if (nextMode) {
+                showNotification("섹션 드래그 편집 모드가 켜졌습니다.", 'info');
+            } else {
+                showNotification("레이아웃 변경 내용이 저장되었습니다.", 'success');
+            }
         };
 
         // --- Local Storage Management (Data) ---
@@ -77,6 +182,10 @@
                         if (typeof char.monthlyCount === 'undefined') char.monthlyCount = 0;
                         if (typeof char.isCompleted === 'undefined') char.isCompleted = false;
                         if (typeof char.isPinned === 'undefined') char.isPinned = false;
+                        if (typeof char.animationTheme === 'undefined') {
+                            char.animationTheme = 'warrior';
+                        }
+                        char.animationTheme = normalizeAnimationTheme(char.animationTheme);
                         if (typeof char.orderIndex === 'undefined' || char.orderIndex === null) {
                             char.orderIndex = index;
                         }
@@ -182,18 +291,26 @@
             const trackerView = document.getElementById('tracker-view');
             const settlementView = document.getElementById('settlement-view');
             const toggleButton = document.getElementById('view-toggle-button');
+            const layoutEditButton = document.getElementById('layout-edit-toggle');
             
             currentView = viewId;
 
             if (viewId === 'settlement') {
+                if (isLayoutEditMode) setLayoutEditMode(false);
                 trackerView.classList.add('hidden');
                 settlementView.classList.remove('hidden');
+                if (layoutEditButton && layoutEditButton.parentElement) {
+                    layoutEditButton.parentElement.classList.add('hidden');
+                }
                 toggleButton.textContent = '🏠 트래커 돌아가기';
                 toggleButton.onclick = () => switchView('tracker');
                 renderSettlement(); // Render the content immediately
             } else { // 'tracker'
                 trackerView.classList.remove('hidden');
                 settlementView.classList.add('hidden');
+                if (layoutEditButton && layoutEditButton.parentElement) {
+                    layoutEditButton.parentElement.classList.remove('hidden');
+                }
                 toggleButton.textContent = '💰 정산표 보기';
                 toggleButton.onclick = () => switchView('settlement');
                 renderCharacters(); // Re-render the tracker list
@@ -232,16 +349,26 @@
 
         const createCharacterCard = (data,idx) => {
             const charId = data.id;
+            const isWeeklyGoalReached = data.weeklyCount >= REWARD_RULES.weekly.divisor;
+            const isMonthlyGoalReached = data.monthlyCount >= REWARD_RULES.monthly.divisor;
+            const isGoalReached = isWeeklyGoalReached || isMonthlyGoalReached;
+            const animationTheme = normalizeAnimationTheme(data.animationTheme);
             
             const card = document.createElement('div');
             const pinBorderClass = data.isPinned ? 'border-pin-highlight shadow-lg' : 'hover:border-accent-blue';
-            card.className = `character-card bg-secondary-theme p-4 rounded-xl shadow-lg flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0 sm:space-x-4 border border-theme transition duration-200 cursor-grab active:cursor-grabbing ${data.isCompleted ? 'opacity-70 border-green-500/50' : pinBorderClass}`;
+            const cardCursorClass = isLayoutEditMode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing';
+            const goalCardClass = isGoalReached ? `goal-achieved-card theme-${animationTheme}` : '';
+            card.className = `character-card bg-secondary-theme p-4 rounded-xl shadow-lg flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0 sm:space-x-4 border border-theme transition duration-200 ${cardCursorClass} ${data.isCompleted ? 'opacity-70 border-green-500/50' : pinBorderClass} ${goalCardClass}`;
             card.dataset.id = charId;
 
-            // NEW: Drag and drop attributes and events
-            card.setAttribute('draggable', 'true');
-            card.addEventListener('dragstart', handleDragStart);
-            card.addEventListener('dragend', handleDragEnd);
+            // Drag character cards only in normal mode.
+            if (!isLayoutEditMode) {
+                card.setAttribute('draggable', 'true');
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+            } else {
+                card.setAttribute('draggable', 'false');
+            }
 
             // 1. Name, Completion Checkbox, Pin, and ID
             const nameSection = document.createElement('div');
@@ -249,7 +376,12 @@
             
             // Check weekly count for visual highlight (FEATURE 1)
             const isWeeklyOver5 = data.weeklyCount >= 5;
-            const weeklyHighlightClass = isWeeklyOver5 ? 'text-red-500 font-extrabold' : 'text-accent-blue';
+            const weeklyHighlightClass = isWeeklyGoalReached
+                ? 'text-amber-300 font-extrabold goal-counter'
+                : (isWeeklyOver5 ? 'text-red-500 font-extrabold' : 'text-accent-blue');
+            const monthlyHighlightClass = isMonthlyGoalReached
+                ? 'text-amber-300 font-extrabold goal-counter'
+                : 'text-accent-blue';
 
             const nameControls = document.createElement('div');
             nameControls.className = 'flex items-center space-x-2';
@@ -275,6 +407,15 @@
                 e.stopPropagation(); 
                 togglePin(charId);
             };
+
+            const themeEditButton = document.createElement('button');
+            themeEditButton.className = 'p-1 rounded-full text-base text-subtle-theme hover:text-accent-blue transition duration-150';
+            themeEditButton.textContent = '⚙️';
+            themeEditButton.title = '완료 연출 테마 변경';
+            themeEditButton.onclick = (e) => {
+                e.stopPropagation();
+                changeCharacterTheme(charId);
+            };
             
             const nameEl = document.createElement('p');
             const nameTextColor = data.isPinned ? 'text-pin-highlight' : '';
@@ -287,13 +428,19 @@
             const idSpan = document.createElement('span');
             idSpan.className = 'text-xs text-subtle-theme mt-1';
             idSpan.textContent = `순번: ${idx+1}`;
-            
+
+            const themeBadge = document.createElement('span');
+            themeBadge.className = `mt-1 px-2 py-0.5 text-[11px] font-semibold rounded-full theme-badge theme-badge-${animationTheme}`;
+            themeBadge.textContent = `연출: ${ANIMATION_THEMES[animationTheme].label}`;
+
             nameControls.appendChild(checkbox);
             nameControls.appendChild(pinButton);
+            nameControls.appendChild(themeEditButton);
             nameControls.appendChild(nameEl);
 
             nameSection.appendChild(nameControls);
             nameSection.appendChild(idSpan);
+            nameSection.appendChild(themeBadge);
 
             // 2. Weekly Count Section (FEATURE 1 usage)
             const weeklySection = createCounterSection(
@@ -310,7 +457,7 @@
                 data.monthlyCount,
                 'monthlyCount',
                 charId,
-                'text-accent-blue' // Default accent class
+                monthlyHighlightClass
             );
 
             // 4. Delete Button
@@ -329,8 +476,67 @@
             card.appendChild(weeklySection);
             card.appendChild(monthlySection);
             card.appendChild(deleteButton);
+            if (isGoalReached) {
+                const goalLabel = isWeeklyGoalReached && isMonthlyGoalReached
+                    ? '주/월간 완료'
+                    : (isMonthlyGoalReached ? '월간 완료' : '주간 완료');
+                card.appendChild(createGoalCelebrationLayer(goalLabel, animationTheme));
+            }
 
             return card;
+        };
+
+        const createGoalCelebrationLayer = (label, theme) => {
+            const layer = document.createElement('div');
+            layer.className = 'goal-celebration';
+            const normalizedTheme = normalizeAnimationTheme(theme);
+            layer.dataset.theme = normalizedTheme;
+
+            const createEffect = (className, style = {}, text = '') => {
+                const node = document.createElement('span');
+                node.className = className;
+                Object.entries(style).forEach(([key, value]) => node.style.setProperty(key, value));
+                if (text) node.textContent = text;
+                return node;
+            };
+
+            if (normalizedTheme === 'warrior') {
+                [-36, -16, 8, 32, 54].forEach((angle, index) => {
+                    layer.appendChild(createEffect('fx-warrior-slash', { '--angle': `${angle}deg`, '--delay': `${index * 0.1}s` }));
+                });
+                layer.appendChild(createEffect('fx-warrior-shock'));
+            } else if (normalizedTheme === 'mage') {
+                [0, 0.3].forEach((delay) => {
+                    layer.appendChild(createEffect('fx-mage-rune', { '--delay': `${delay}s` }));
+                });
+                [0, 60, 120, 180, 240, 300].forEach((angle, index) => {
+                    layer.appendChild(createEffect('fx-mage-star', { '--angle': `${angle}deg`, '--delay': `${index * 0.08}s` }, '✦'));
+                });
+            } else if (normalizedTheme === 'archer') {
+                [-20, 0, 20].forEach((offset, index) => {
+                    layer.appendChild(createEffect('fx-archer-trail', { '--offset-y': `${offset}px`, '--delay': `${index * 0.15}s` }));
+                });
+                layer.appendChild(createEffect('fx-archer-impact'));
+            } else if (normalizedTheme === 'rogue') {
+                [-36, -14, 12, 34].forEach((offset, index) => {
+                    layer.appendChild(createEffect('fx-rogue-smoke', { '--offset-x': `${offset}px`, '--delay': `${index * 0.12}s` }));
+                });
+                layer.appendChild(createEffect('fx-rogue-blade'));
+            } else if (normalizedTheme === 'healer') {
+                [0, 0.35].forEach((delay) => {
+                    layer.appendChild(createEffect('fx-healer-ring', { '--delay': `${delay}s` }));
+                });
+                [-26, -10, 10, 26].forEach((offset, index) => {
+                    layer.appendChild(createEffect('fx-healer-plus', { '--offset-x': `${offset}px`, '--delay': `${index * 0.13}s` }, '+'));
+                });
+            }
+
+            const badge = document.createElement('span');
+            badge.className = 'goal-badge';
+            badge.textContent = `${ANIMATION_THEMES[normalizedTheme].label} ${label}`;
+            layer.appendChild(badge);
+
+            return layer;
         };
         
         // Updated function signature to accept highlightClass
@@ -537,7 +743,7 @@
         };
         
         // --- Data Manipulation Functions ---
-        const addCharacter = (name) => {
+        const addCharacter = (name, animationTheme = 'warrior') => {
             const newId = Date.now();  
             const newCharacter = {
                 id: newId,
@@ -546,6 +752,7 @@
                 monthlyCount: 0,
                 isCompleted: false,  
                 isPinned: false,
+                animationTheme: normalizeAnimationTheme(animationTheme),
                 lastUpdated: newId,  
                 orderIndex: characters.length
             };
@@ -580,6 +787,40 @@
             showNotification(isPinning ? `'${characters[charIndex].name}'을(를) 상단에 고정했습니다.` : `'${characters[charIndex].name}' 고정을 해제했습니다.`, 'info');
         };
 
+        const changeCharacterTheme = (charId) => {
+            const charIndex = characters.findIndex(char => char.id === charId);
+            if (charIndex === -1) {
+                showNotification("캐릭터 정보를 찾을 수 없습니다.", 'error');
+                return;
+            }
+
+            const currentTheme = normalizeAnimationTheme(characters[charIndex].animationTheme);
+            const response = window.prompt(
+                `연출 테마를 입력하세요.\n${ANIMATION_THEME_HELP_TEXT}\n\n현재: ${ANIMATION_THEMES[currentTheme].label}\n입력: 번호(1~5) 또는 키워드(warrior/mage/archer/rogue/healer)`,
+                currentTheme
+            );
+
+            if (response === null) return;
+            const trimmed = response.trim().toLowerCase();
+            if (!trimmed) return;
+
+            let nextTheme = trimmed;
+            if (/^\d+$/.test(trimmed)) {
+                const index = Number(trimmed) - 1;
+                if (index >= 0 && index < ANIMATION_THEME_KEYS.length) {
+                    nextTheme = ANIMATION_THEME_KEYS[index];
+                }
+            }
+            nextTheme = normalizeAnimationTheme(nextTheme);
+
+            characters[charIndex].animationTheme = nextTheme;
+            saveToLocalStorage();
+            showNotification(
+                `'${characters[charIndex].name}' 연출 테마가 ${ANIMATION_THEMES[nextTheme].label}으로 변경되었습니다.`,
+                'success'
+            );
+        };
+
         const handleCountAction = (charId, fieldName, action) => {
             const charIndex = characters.findIndex(char => char.id === charId);
             if (charIndex === -1) {
@@ -588,7 +829,9 @@
             }
             
             const data = characters[charIndex];
-            const MONTHLY_CAP = 30;
+            const MONTHLY_CAP = REWARD_RULES.monthly.divisor;
+            const previousWeeklyCount = data.weeklyCount;
+            const previousMonthlyCount = data.monthlyCount;
             let updated = false;
 
             if (fieldName === 'weeklyCount') {
@@ -642,6 +885,12 @@
             }
 
             if (updated) {
+                if (previousWeeklyCount < REWARD_RULES.weekly.divisor && data.weeklyCount >= REWARD_RULES.weekly.divisor) {
+                    showNotification(`${data.name} 주간 냥골 숙제가 완료되었습니다!`, 'success');
+                }
+                if (previousMonthlyCount < REWARD_RULES.monthly.divisor && data.monthlyCount >= REWARD_RULES.monthly.divisor) {
+                    showNotification(`${data.name} 월간 냥골 숙제가 완료되었습니다!`, 'success');
+                }
                 saveToLocalStorage(); 
             }
         };
@@ -689,6 +938,7 @@
         // --- Drag and Drop Handlers ---
         
         const handleDragStart = (e) => {
+            if (isLayoutEditMode) return;
             const card = getCardElement(e.target);
             if (!card) return;
 
@@ -701,6 +951,7 @@
         };
 
         const handleDragOver = (e) => {
+            if (isLayoutEditMode) return;
             e.preventDefault();
             const targetCard = getCardElement(e.target);
             if (!targetCard || targetCard === draggedElement) return;
@@ -725,6 +976,7 @@
         };
 
         const handleDrop = (e) => {
+            if (isLayoutEditMode) return;
             e.preventDefault();
             if (!draggedElement) return;
 
@@ -754,6 +1006,56 @@
             showNotification("캐릭터 순서가 드래그 앤 드롭으로 변경되었습니다.", 'info');
         };
         // --- End Drag and Drop Handlers ---
+
+        // --- Layout Section Drag and Drop Handlers ---
+        const handleSectionDragStart = (e) => {
+            if (!isLayoutEditMode) return;
+            const section = getLayoutSectionElement(e.target);
+            if (!section) return;
+            draggedSectionElement = section;
+            e.dataTransfer.setData('text/plain', section.dataset.sectionId || '');
+            setTimeout(() => {
+                section.classList.add('dragging-section');
+            }, 0);
+        };
+
+        const handleSectionDragOver = (e) => {
+            if (!isLayoutEditMode) return;
+            e.preventDefault();
+            const targetSection = getLayoutSectionElement(e.target);
+            if (!targetSection || targetSection === draggedSectionElement) return;
+
+            const trackerSections = document.getElementById('tracker-sections');
+            if (!trackerSections) return;
+
+            const boundingBox = targetSection.getBoundingClientRect();
+            const offset = boundingBox.y + (boundingBox.height / 2);
+            if (e.clientY < offset) {
+                trackerSections.insertBefore(draggedSectionElement, targetSection);
+            } else {
+                trackerSections.insertBefore(draggedSectionElement, targetSection.nextSibling);
+            }
+        };
+
+        const handleSectionDragEnd = (e) => {
+            const section = getLayoutSectionElement(e.target);
+            if (section) {
+                section.classList.remove('dragging-section');
+            }
+            if (isLayoutEditMode) {
+                syncTrackerLayoutOrder();
+            }
+            draggedSectionElement = null;
+        };
+
+        const handleSectionDrop = (e) => {
+            if (!isLayoutEditMode) return;
+            e.preventDefault();
+            if (!draggedSectionElement) return;
+            syncTrackerLayoutOrder();
+            showNotification("트래커 섹션 순서가 저장되었습니다.", 'info');
+        };
+        // --- End Layout Section Drag and Drop Handlers ---
 
 
         // --- Hold-to-Repeat Event Setup ---
@@ -795,6 +1097,8 @@
         window.onload = () => {
             loadTheme();
             loadFromLocalStorage();
+            applyTrackerLayout();
+            setLayoutEditMode(false);
 
             // Set initial view and button handler
             window.switchView('tracker'); 
@@ -803,6 +1107,16 @@
             const characterListDiv = document.getElementById('character-list');
             characterListDiv.addEventListener('dragover', handleDragOver);
             characterListDiv.addEventListener('drop', handleDrop);
+
+            const trackerSections = document.getElementById('tracker-sections');
+            if (trackerSections) {
+                trackerSections.addEventListener('dragover', handleSectionDragOver);
+                trackerSections.addEventListener('drop', handleSectionDrop);
+            }
+            document.querySelectorAll('.layout-section').forEach((section) => {
+                section.addEventListener('dragstart', handleSectionDragStart);
+                section.addEventListener('dragend', handleSectionDragEnd);
+            });
 
             // 메모 입력 이벤트 리스너 설정
             const memoInput = document.getElementById('memo-input');
@@ -816,12 +1130,16 @@
             charForm.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const nameInput = document.getElementById('char-name-input');
+                const themeInput = document.getElementById('char-theme-input');
                 const name = nameInput.value.trim();
-                
+                const selectedTheme = themeInput ? themeInput.value : 'warrior';
+
                 if (name) {
-                    addCharacter(name);
+                    addCharacter(name, selectedTheme);
                     nameInput.value = ''; // Clear input
-                    showNotification(`'${name}' 캐릭터가 추가되었습니다.`, 'success');
+                    if (themeInput) themeInput.value = 'warrior';
+                    const themeLabel = ANIMATION_THEMES[normalizeAnimationTheme(selectedTheme)].label;
+                    showNotification(`'${name}' 캐릭터가 추가되었습니다. (연출: ${themeLabel})`, 'success');
                 } else {
                     showNotification("캐릭터 이름을 입력해주세요.");
                 }
@@ -963,7 +1281,317 @@
         .drag-shadow {
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
         }
+        .dragging-section {
+            opacity: 0.65;
+            box-shadow: 0 12px 22px -8px rgba(0, 0, 0, 0.4);
+        }
+        .layout-edit-mode .layout-section {
+            border: 1px dashed var(--color-accent);
+            border-radius: 0.9rem;
+            cursor: grab;
+            position: relative;
+        }
+        .layout-edit-mode .layout-section::before {
+            content: "Drag section";
+            position: absolute;
+            top: -10px;
+            right: 12px;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: var(--color-accent);
+            color: #fff;
+            letter-spacing: 0.02em;
+        }
+        .layout-edit-mode .layout-section:active {
+            cursor: grabbing;
+        }
 
+        /* Goal Completion Celebration */
+        .theme-badge {
+            border: 1px solid var(--color-border);
+            color: var(--color-text-subtle);
+            background: color-mix(in srgb, var(--bg-primary) 75%, transparent);
+        }
+        .theme-badge-warrior { border-color: rgba(245, 158, 11, 0.45); color: #f59e0b; }
+        .theme-badge-mage { border-color: rgba(167, 139, 250, 0.45); color: #a78bfa; }
+        .theme-badge-archer { border-color: rgba(52, 211, 153, 0.45); color: #34d399; }
+        .theme-badge-rogue { border-color: rgba(148, 163, 184, 0.45); color: #94a3b8; }
+        .theme-badge-healer { border-color: rgba(110, 231, 183, 0.45); color: #6ee7b7; }
+
+        .goal-achieved-card {
+            position: relative;
+            overflow: hidden;
+            isolation: isolate;
+            border-color: rgba(250, 204, 21, 0.8);
+            box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.25), 0 18px 35px -24px rgba(245, 158, 11, 0.95);
+            animation: goal-card-glow 2.2s ease-in-out infinite;
+        }
+        .goal-achieved-card::before {
+            content: "";
+            position: absolute;
+            inset: -30%;
+            background: conic-gradient(
+                from 90deg,
+                rgba(250, 204, 21, 0),
+                rgba(250, 204, 21, 0.32),
+                rgba(255, 255, 255, 0),
+                rgba(250, 204, 21, 0.25),
+                rgba(250, 204, 21, 0)
+            );
+            animation: goal-shimmer 3s linear infinite;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .goal-achieved-card.theme-warrior { border-color: rgba(245, 158, 11, 0.8); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25), 0 18px 35px -24px rgba(245, 158, 11, 0.95); }
+        .goal-achieved-card.theme-mage { border-color: rgba(167, 139, 250, 0.8); box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.25), 0 18px 35px -24px rgba(167, 139, 250, 0.95); }
+        .goal-achieved-card.theme-archer { border-color: rgba(52, 211, 153, 0.8); box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.25), 0 18px 35px -24px rgba(52, 211, 153, 0.95); }
+        .goal-achieved-card.theme-rogue { border-color: rgba(148, 163, 184, 0.8); box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.25), 0 18px 35px -24px rgba(148, 163, 184, 0.95); }
+        .goal-achieved-card.theme-healer { border-color: rgba(110, 231, 183, 0.8); box-shadow: 0 0 0 1px rgba(110, 231, 183, 0.25), 0 18px 35px -24px rgba(110, 231, 183, 0.95); }
+
+        .goal-achieved-card > * {
+            position: relative;
+            z-index: 2;
+        }
+        .goal-counter {
+            text-shadow: 0 0 14px rgba(250, 204, 21, 0.7);
+            animation: goal-counter-pop 0.9s ease-in-out infinite;
+        }
+        .goal-celebration {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .goal-celebration .goal-badge {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            color: #111827;
+            background: linear-gradient(90deg, #fde68a, #f59e0b, #fde68a);
+            box-shadow: 0 8px 18px -10px rgba(245, 158, 11, 0.9);
+            animation: badge-bounce 1.8s ease-in-out infinite;
+        }
+        .goal-achieved-card.theme-mage .goal-badge { background: linear-gradient(90deg, #ddd6fe, #a78bfa, #ddd6fe); }
+        .goal-achieved-card.theme-archer .goal-badge { background: linear-gradient(90deg, #a7f3d0, #34d399, #a7f3d0); }
+        .goal-achieved-card.theme-rogue .goal-badge { background: linear-gradient(90deg, #e2e8f0, #94a3b8, #e2e8f0); }
+        .goal-achieved-card.theme-healer .goal-badge { background: linear-gradient(90deg, #d1fae5, #6ee7b7, #d1fae5); }
+
+        .fx-warrior-slash {
+            position: absolute;
+            left: 50%;
+            top: 52%;
+            width: 4px;
+            height: 34px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #fff, #f59e0b 70%, rgba(245, 158, 11, 0));
+            transform: translate(-50%, -50%) rotate(var(--angle)) scaleY(0.1);
+            opacity: 0;
+            animation: warrior-slash 1.45s ease-out infinite;
+            animation-delay: var(--delay);
+        }
+        .fx-warrior-shock {
+            position: absolute;
+            inset: 22% 18%;
+            border-radius: 999px;
+            border: 2px solid rgba(245, 158, 11, 0.5);
+            opacity: 0;
+            animation: warrior-shock 1.45s ease-out infinite;
+        }
+
+        .fx-mage-rune {
+            position: absolute;
+            left: 50%;
+            top: 52%;
+            width: 88px;
+            aspect-ratio: 1;
+            border-radius: 999px;
+            border: 2px solid rgba(167, 139, 250, 0.7);
+            transform: translate(-50%, -50%) scale(0.35);
+            opacity: 0;
+            animation: mage-rune 1.8s ease-out infinite;
+            animation-delay: var(--delay);
+        }
+        .fx-mage-star {
+            position: absolute;
+            left: 50%;
+            top: 52%;
+            font-size: 14px;
+            color: #ddd6fe;
+            text-shadow: 0 0 8px rgba(196, 181, 253, 0.8);
+            transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0);
+            opacity: 0;
+            animation: mage-star 1.7s ease-out infinite;
+            animation-delay: var(--delay);
+        }
+
+        .fx-archer-trail {
+            position: absolute;
+            left: -20%;
+            top: calc(52% + var(--offset-y));
+            width: 56px;
+            height: 3px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(255,255,255,0), #34d399 75%, rgba(52, 211, 153, 0));
+            opacity: 0;
+            animation: archer-trail 1.6s linear infinite;
+            animation-delay: var(--delay);
+        }
+        .fx-archer-impact {
+            position: absolute;
+            right: 18%;
+            top: 49%;
+            width: 32px;
+            height: 32px;
+            border-radius: 999px;
+            border: 2px solid rgba(110, 231, 183, 0.85);
+            opacity: 0;
+            animation: archer-impact 1.6s ease-out infinite;
+        }
+
+        .fx-rogue-smoke {
+            position: absolute;
+            left: 50%;
+            top: 56%;
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            background: radial-gradient(circle at 30% 30%, rgba(226,232,240,0.55), rgba(71,85,105,0));
+            transform: translateX(var(--offset-x));
+            opacity: 0;
+            animation: rogue-smoke 1.7s ease-out infinite;
+            animation-delay: var(--delay);
+        }
+        .fx-rogue-blade {
+            position: absolute;
+            left: 50%;
+            top: 52%;
+            width: 5px;
+            height: 44px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, rgba(226,232,240,0), rgba(226,232,240,0.85), rgba(226,232,240,0));
+            transform: translate(-50%, -50%) rotate(28deg);
+            opacity: 0;
+            animation: rogue-blade 1.7s ease-out infinite;
+        }
+
+        .fx-healer-ring {
+            position: absolute;
+            left: 50%;
+            top: 54%;
+            width: 88px;
+            aspect-ratio: 1;
+            border-radius: 999px;
+            border: 2px solid rgba(110, 231, 183, 0.72);
+            transform: translate(-50%, -50%) scale(0.45);
+            opacity: 0;
+            animation: healer-ring 1.9s ease-out infinite;
+            animation-delay: var(--delay);
+        }
+        .fx-healer-plus {
+            position: absolute;
+            left: 50%;
+            top: 60%;
+            color: #a7f3d0;
+            font-size: 16px;
+            font-weight: 700;
+            text-shadow: 0 0 8px rgba(167, 243, 208, 0.85);
+            transform: translateX(var(--offset-x));
+            opacity: 0;
+            animation: healer-plus 1.9s ease-out infinite;
+            animation-delay: var(--delay);
+        }
+
+        @keyframes goal-card-glow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-1px); }
+        }
+        @keyframes goal-shimmer {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes goal-counter-pop {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+        }
+        @keyframes badge-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+        @keyframes warrior-slash {
+            0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--angle)) scaleY(0.1); }
+            16% { opacity: 1; }
+            100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-48px) scaleY(1); }
+        }
+        @keyframes warrior-shock {
+            0% { opacity: 0; transform: scale(0.4); }
+            30% { opacity: 0.75; }
+            100% { opacity: 0; transform: scale(1.18); }
+        }
+        @keyframes mage-rune {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.35); }
+            26% { opacity: 0.8; }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); }
+        }
+        @keyframes mage-star {
+            0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0); }
+            20% { opacity: 1; }
+            100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-46px); }
+        }
+        @keyframes archer-trail {
+            0% { opacity: 0; transform: translateX(0); }
+            12% { opacity: 1; }
+            84% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(140%); }
+        }
+        @keyframes archer-impact {
+            0% { opacity: 0; transform: scale(0.45); }
+            20% { opacity: 0.85; }
+            100% { opacity: 0; transform: scale(1.25); }
+        }
+        @keyframes rogue-smoke {
+            0% { opacity: 0; transform: translateX(var(--offset-x)) translateY(0) scale(0.55); }
+            30% { opacity: 0.75; }
+            100% { opacity: 0; transform: translateX(var(--offset-x)) translateY(-36px) scale(1.2); }
+        }
+        @keyframes rogue-blade {
+            0% { opacity: 0; transform: translate(-50%, -50%) rotate(28deg) scaleY(0.2); }
+            22% { opacity: 0.8; }
+            100% { opacity: 0; transform: translate(-50%, -50%) rotate(28deg) translateY(-42px) scaleY(1); }
+        }
+        @keyframes healer-ring {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.35); }
+            30% { opacity: 0.8; }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+        }
+        @keyframes healer-plus {
+            0% { opacity: 0; transform: translateX(var(--offset-x)) translateY(0) scale(0.6); }
+            18% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(var(--offset-x)) translateY(-48px) scale(1.05); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .goal-achieved-card,
+            .goal-achieved-card::before,
+            .goal-counter,
+            .goal-celebration .goal-badge,
+            .fx-warrior-slash,
+            .fx-warrior-shock,
+            .fx-mage-rune,
+            .fx-mage-star,
+            .fx-archer-trail,
+            .fx-archer-impact,
+            .fx-rogue-smoke,
+            .fx-rogue-blade,
+            .fx-healer-ring,
+            .fx-healer-plus {
+                animation: none !important;
+            }
+        }
         /* Pinned Item Highlighting using CSS Variables */
         .text-pin-highlight {
             color: var(--color-pin-highlight);
@@ -1014,6 +1642,12 @@
                 <span id="theme-icon">☀️</span>
             </button>
         </header>
+        <div class="mb-4 flex justify-end">
+            <button id="layout-edit-toggle" onclick="toggleLayoutEditMode()"
+                    class="px-4 py-2 bg-primary-theme border border-theme rounded-lg text-sm font-semibold hover:opacity-80 transition">
+                레이아웃 편집
+            </button>
+        </div>
 
         <!-- User Info & Disclaimer -->
         <div class="mb-6 bg-primary-theme p-4 rounded-xl shadow border border-theme">
@@ -1023,8 +1657,9 @@
         
         <!-- --- TRACKER VIEW CONTENT --- -->
         <div id="tracker-view">
+            <div id="tracker-sections" class="space-y-8">
             <!-- Memo Section (Collapsible) -->
-            <details class="mb-8 p-6 bg-secondary-theme rounded-xl shadow-lg border border-theme">
+            <details class="layout-section mb-8 p-6 bg-secondary-theme rounded-xl shadow-lg border border-theme" data-section-id="memo">
                 <summary class="text-2xl font-bold cursor-pointer select-none">
                     📝 메모/자유 기록 (여기를 클릭하여 열고 닫기)
                 </summary>
@@ -1035,7 +1670,7 @@
             </details>
 
             <!-- Add Character Form -->
-            <div class="mb-8 p-6 bg-secondary-theme rounded-xl shadow-lg border border-theme">
+            <div class="layout-section mb-8 p-6 bg-secondary-theme rounded-xl shadow-lg border border-theme" data-section-id="add-character">
                 <h2 class="text-2xl font-bold mb-4">새 캐릭터 추가</h2>
                 <form id="add-char-form" class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
                     <input 
@@ -1045,6 +1680,13 @@
                         required
                         class="theme-input flex-grow p-3 border rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none"
                     >
+                    <select id="char-theme-input" class="theme-input p-3 border rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none sm:w-40">
+                        <option value="warrior">전사형</option>
+                        <option value="mage">마법형</option>
+                        <option value="archer">궁수형</option>
+                        <option value="rogue">도적형</option>
+                        <option value="healer">힐러형</option>
+                    </select>
                     <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-accent-blue text-white font-semibold rounded-lg hover:bg-blue-600 transition shadow-lg">
                         캐릭터 추가
                     </button>
@@ -1052,7 +1694,7 @@
             </div>
             
             <!-- Count Reset Section (Compact) -->
-            <div class="mb-8 p-3 bg-primary-theme rounded-xl shadow-lg border border-theme flex flex-col sm:flex-row items-center justify-between">
+            <div class="layout-section mb-8 p-3 bg-primary-theme rounded-xl shadow-lg border border-theme flex flex-col sm:flex-row items-center justify-between" data-section-id="reset">
                 <span class="text-sm font-semibold text-subtle-theme mb-2 sm:mb-0">전체 카운트 초기화 (주간/월간)</span>
                 <button id="reset-all-button" class="w-full sm:w-auto px-4 py-2 bg-accent-red text-white text-sm font-semibold rounded-lg hover:bg-red-600 transition shadow-lg">
                     🔄 모두 리셋
@@ -1060,12 +1702,13 @@
             </div>
 
             <!-- Character List -->
-            <section>
+            <section class="layout-section" data-section-id="character-list">
                 <h2 class="text-2xl font-bold mb-4 border-b border-theme pb-2">캐릭터 현황 (드래그 앤 드롭으로 순서 변경 가능)</h2>
                 <div id="character-list" class="space-y-4">
                     <p class="text-subtle-theme p-4 text-center">캐릭터 데이터를 로드 중입니다...</p>
                 </div>
             </section>
+            </div>
         </div>
         
         <!-- --- SETTLEMENT VIEW CONTENT (NEW) --- -->
