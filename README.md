@@ -39,3 +39,22 @@
 
 - 완료 연출 DOM 생성: `createGoalCelebrationLayer(...)`
 - 연출 스타일/키프레임: CSS의 `Goal Completion Celebration` 섹션
+
+## Encoding / Editor Settings
+
+To prevent Korean text corruption, this project now includes editor defaults:
+
+- `.editorconfig`
+  - `charset = utf-8`
+  - `end_of_line = lf`
+  - `insert_final_newline = true`
+- `.vscode/settings.json`
+  - `"files.encoding": "utf8"`
+  - `"files.autoGuessEncoding": false`
+  - `"files.eol": "\\n"`
+
+Recommended:
+
+1. Open the project in VS Code.
+2. Keep the workspace encoding as UTF-8.
+3. Do not save `Nyangol.html` or `README.md` with CP949/EUC-KR.
