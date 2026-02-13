@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>냥골 던전 숙제 및 보상 트래커</title>
+    <!-- 귀여운 스파클(✨) 파비콘 (Base64 인코딩된 SVG) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        // --- Global Constants and Initialization ---
+        // Firebase usage is discontinued. Using local storage instead.
+
+        // Local Storage Keys
+        const STORAGE_KEY = 'nyangolTrackerData';
+        const MEMO_KEY = 'nyangolMemoContent';
+        const THEME_KEY = 'nyangolTheme';
+        const PRICE_KEY = 'nyangolItemPrices'; // Price storage key
+
+        // Reward Rules
+        const REWARD_RULES = {
+            weekly: { divisor: 10, fragments: 50, feathers: 20 },
+            monthly: { divisor: 30, fragments: 100 }
+        };
+        const DEFAULT_PRICES = { fragmentPrice: 68000, featherPrice: 100000 };
+
+        // Global State
+        let characters = [];
+        let itemPrices = DEFAULT_PRICES;
+        let currentView = 'tracker';
+
+        // Drag and Drop Globals
+        let draggedElement = null; 
+
+        // Repeat/Hold Logic Globals
+        let repeatTimer = null;
+        let repeatTimeout = null;
+        const INITIAL_DELAY = 500;
+        const REPEAT_RATE = 100;
+
+        // Clears the repeating interval and initial timeout
+        const stopRepeat = () => {
+            clearTimeout(repeatTimeout);
+            if (repeatTimer) {
+                clearInterval(repeatTimer);
+                repeatTimer = null;
+            }
+        };
+
+        // Finds the closest parent card element
+        const getCardElement = (target) => {
+            return target.closest('.character-card');
+        };
+
+        // --- Local Storage Management (Data) ---
+
+        // Saves data to local storage and updates the UI.
+        const saveToLocalStorage = () => {
+            reindexCharacters();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(characters));
+            if (currentView === 'tracker') {
+                renderCharacters();
+            } else {
+                renderSettlement(); // Re-render settlement view if active
+            }
+        };
+
+        // Loads data from local storage on browser load.
+        const loadFromLocalStorage = () => {
+            const storedData = localStorage.getItem(STORAGE_KEY);
+            if (storedData) {
+                try {
+                    characters = JSON.parse(storedData);
+                    // Initialize missing fields for compatibility
+                    characters.forEach((char, index) => {
+                        if (typeof char.weeklyCount === 'undefined') char.weeklyCount = 0;
+                        if (typeof char.monthlyCount === 'undefined') char.monthlyCount = 0;
+                        if (typeof char.isCompleted === 'undefined') char.isCompleted = false;
+                        if (typeof char.isPinned === 'undefined') char.isPinned = false;
+                        if (typeof char.orderIndex === 'undefined' || char.orderIndex === null) {
+                            char.orderIndex = index;
+                        }
+                        if (typeof char.lastUpdated === 'undefined') {
+                            char.lastUpdated = Date.now();
+                        }
+                    });
+                    reindexCharacters();
+                } catch (e) {
+                    console.error("Error parsing local storage data:", e);
+                    characters = [];
+                }
+            }
+            
+            // Memo load and UI reflection
+            const storedMemo = localStorage.getItem(MEMO_KEY);
+            const memoInput = document.getElementById('memo-input');
+            if (storedMemo && memoInput) {
+                memoInput.value = storedMemo;
+            }
+
+            // Update user info area
+            document.getElementById('user-info').textContent = '데이터는 이 웹 브라우저에만 저장됩니다.';
+            renderCharacters(); // Initial render for tracker view
+            loadPrices(); // Load item prices
+        };
+        
+        // Function to re-assign continuous orderIndex to all characters
+        const reindexCharacters = () => {
+            // 1. First, sort by the desired visual order (pinned, then current orderIndex)
+            characters.sort((a, b) => {
+                const pinSort = (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0);
+                if (pinSort !== 0) {
+                    return pinSort;
+                }
+                // Secondary sort: by custom order index
+                return (a.orderIndex || 0) - (b.orderIndex || 0);
+            });
+
+            // 2. Then, re-assign a new sequential index
+            characters.forEach((char, index) => {
+                char.orderIndex = index;
+            });
+        };
+
+        // --- Local Storage Management (Prices) ---
+        
+        const loadPrices = () => {
+            const storedPrices = localStorage.getItem(PRICE_KEY);
+            if (storedPrices) {
+                try {
+                    itemPrices = { ...DEFAULT_PRICES, ...JSON.parse(storedPrices) };
+                } catch (e) {
+                    console.error("Error parsing price data:", e);
+                    itemPrices = DEFAULT_PRICES;
+                }
+            }
+        };
+
+        const savePrices = () => {
+            localStorage.setItem(PRICE_KEY, JSON.stringify(itemPrices));
+            // Only re-render settlement if we are in that view
+            if (currentView === 'settlement') {
+                renderSettlement();
+            }
+        };
+
+
+        // --- Theme Management ---
+        const applyTheme = (theme) => {
+            const body = document.body;
+            const toggleButton = document.getElementById('theme-icon');
+            
+            if (theme === 'light') {
+                body.classList.add('light-theme');
+                if (toggleButton) {
+                    toggleButton.innerHTML = '🌙'; // Dark mode icon
+                    toggleButton.title = '다크 모드로 전환';
+                }
+            } else { // dark
+                body.classList.remove('light-theme');
+                if (toggleButton) {
+                    toggleButton.innerHTML = '☀️'; // Light mode icon
+                    toggleButton.title = '라이트 모드로 전환';
+                }
+            }
+            localStorage.setItem(THEME_KEY, theme);
+        };
+
+        window.toggleTheme = () => { // Made global to be callable from HTML onclick
+            const currentTheme = localStorage.getItem(THEME_KEY) === 'light' ? 'dark' : 'light';
+            applyTheme(currentTheme);
+        };
+        
+        const loadTheme = () => {
+            const savedTheme = localStorage.getItem(THEME_KEY) || 'dark'; // Default to dark
+            applyTheme(savedTheme);
+        };
+        
+        // --- View Switching ---
+        
+        window.switchView = (viewId) => {
+            const trackerView = document.getElementById('tracker-view');
+            const settlementView = document.getElementById('settlement-view');
+            const toggleButton = document.getElementById('view-toggle-button');
+            
+            currentView = viewId;
+
+            if (viewId === 'settlement') {
+                trackerView.classList.add('hidden');
+                settlementView.classList.remove('hidden');
+                toggleButton.textContent = '🏠 트래커 돌아가기';
+                toggleButton.onclick = () => switchView('tracker');
+                renderSettlement(); // Render the content immediately
+            } else { // 'tracker'
+                trackerView.classList.remove('hidden');
+                settlementView.classList.add('hidden');
+                toggleButton.textContent = '💰 정산표 보기';
+                toggleButton.onclick = () => switchView('settlement');
+                renderCharacters(); // Re-render the tracker list
+            }
+        };
+
+
+        // --- UI Rendering Functions (Tracker View) ---
+
+        const renderCharacters = () => {
+            const characterListDiv = document.getElementById('character-list');
+            // Check if the element exists and the current view is tracker before rendering
+            if (!characterListDiv || currentView !== 'tracker') return;
+
+            characterListDiv.innerHTML = ''; // Clear existing list
+
+            if (characters.length === 0) {
+                characterListDiv.innerHTML = '<p class="text-subtle-theme p-4 text-center">아직 등록된 캐릭터가 없습니다. 새 캐릭터를 추가해 보세요!</p>';
+                return;
+            }
+
+            // Sort (Done in reindexCharacters/saveToLocalStorage, but re-sorting here for clarity)
+            characters.sort((a, b) => {
+                const pinSort = (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0);
+                if (pinSort !== 0) {
+                    return pinSort;
+                }
+                return (a.orderIndex || 0) - (b.orderIndex || 0);
+            });
+
+            // Create cards for each character
+            characters.forEach((charData,idx) => {
+                characterListDiv.appendChild(createCharacterCard(charData,idx));
+            });
+        };
+
+        const createCharacterCard = (data,idx) => {
+            const charId = data.id;
+            
+            const card = document.createElement('div');
+            const pinBorderClass = data.isPinned ? 'border-pin-highlight shadow-lg' : 'hover:border-accent-blue';
+            card.className = `character-card bg-secondary-theme p-4 rounded-xl shadow-lg flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0 sm:space-x-4 border border-theme transition duration-200 cursor-grab active:cursor-grabbing ${data.isCompleted ? 'opacity-70 border-green-500/50' : pinBorderClass}`;
+            card.dataset.id = charId;
+
+            // NEW: Drag and drop attributes and events
+            card.setAttribute('draggable', 'true');
+            card.addEventListener('dragstart', handleDragStart);
+            card.addEventListener('dragend', handleDragEnd);
+
+            // 1. Name, Completion Checkbox, Pin, and ID
+            const nameSection = document.createElement('div');
+            nameSection.className = 'flex flex-col items-center sm:items-start w-full sm:w-[25%] min-w-[150px]'; 
+            
+            // Check weekly count for visual highlight (FEATURE 1)
+            const isWeeklyOver5 = data.weeklyCount >= 5;
+            const weeklyHighlightClass = isWeeklyOver5 ? 'text-red-500 font-extrabold' : 'text-accent-blue';
+
+            const nameControls = document.createElement('div');
+            nameControls.className = 'flex items-center space-x-2';
+            
+            // Checkbox (DESIGN IMPROVEMENT APPLIED)
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            // Bolder, slightly larger, and more rounded checkbox style
+            // Note: Relying on browser default checkmark and Tailwind's ability to style the box.
+            checkbox.className = 'h-6 w-6 text-green-500 bg-secondary-theme border-2 border-theme rounded-lg focus:ring-green-500 cursor-pointer flex-shrink-0'; 
+            checkbox.checked = data.isCompleted;
+            checkbox.title = '숙제 완료 체크';
+            checkbox.onchange = () => toggleCompletion(charId);
+
+            // Pin Button
+            const pinButton = document.createElement('button');
+            const pinIcon = data.isPinned ? '📌' : '📍'; 
+            const pinColorClass = data.isPinned ? 'text-pin-highlight' : 'text-subtle-theme hover:text-pin-highlight';
+            pinButton.className = `p-1 rounded-full text-lg transition duration-150 ${pinColorClass}`;
+            pinButton.innerHTML = pinIcon;
+            pinButton.title = data.isPinned ? '고정 해제' : '상단 고정';
+            pinButton.onclick = (e) => {
+                e.stopPropagation(); 
+                togglePin(charId);
+            };
+            
+            const nameEl = document.createElement('p');
+            const nameTextColor = data.isPinned ? 'text-pin-highlight' : '';
+            // FEATURE 2 REVERTED: Removed clickable classes and handler.
+            nameEl.className = `text-xl font-bold ${data.isCompleted ? 'line-through text-subtle-theme' : nameTextColor}`; 
+            nameEl.textContent = data.name;
+
+            // Name click handler removed (was previously nameEl.onclick)
+
+            const idSpan = document.createElement('span');
+            idSpan.className = 'text-xs text-subtle-theme mt-1';
+            idSpan.textContent = `순번: ${idx+1}`;
+            
+            nameControls.appendChild(checkbox);
+            nameControls.appendChild(pinButton);
+            nameControls.appendChild(nameEl);
+
+            nameSection.appendChild(nameControls);
+            nameSection.appendChild(idSpan);
+
+            // 2. Weekly Count Section (FEATURE 1 usage)
+            const weeklySection = createCounterSection(
+                '주간 냥골',
+                data.weeklyCount,
+                'weeklyCount',
+                charId,
+                weeklyHighlightClass // Pass highlight class
+            );
+
+            // 3. Monthly Count Section (Uses default accent color)
+            const monthlySection = createCounterSection(
+                '월간 냥골',
+                data.monthlyCount,
+                'monthlyCount',
+                charId,
+                'text-accent-blue' // Default accent class
+            );
+
+            // 4. Delete Button
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'text-accent-red hover:opacity-80 p-2 rounded-full transition duration-150 flex-shrink-0';
+            deleteButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            `;
+            deleteButton.title = `${data.name} 캐릭터 삭제`;
+            deleteButton.onclick = () => deleteCharacter(charId, data.name);
+            
+            // Combine all sections
+            card.appendChild(nameSection);
+            card.appendChild(weeklySection);
+            card.appendChild(monthlySection);
+            card.appendChild(deleteButton);
+
+            return card;
+        };
+        
+        // Updated function signature to accept highlightClass
+        const createCounterSection = (title, count, fieldName, charId, highlightClass) => {
+            const section = document.createElement('div');
+            section.className = 'flex flex-col items-center w-full sm:w-[30%] min-w-[120px]'; 
+            
+            // Title
+            const titleEl = document.createElement('p');
+            titleEl.className = 'text-sm font-medium text-subtle-theme mb-1 mr-[45px]'; 
+            titleEl.textContent = title;
+            
+            // Count Display and Controls
+            const controls = document.createElement('div');
+            controls.className = 'flex items-center space-x-1.5';
+            
+            const countEl = document.createElement('span');
+            // Use the passed highlightClass directly here (FEATURE 1)
+            countEl.className = `text-3xl font-extrabold w-12 text-center ${highlightClass}`; 
+            countEl.textContent = String(count).padStart(2, '0');
+
+            // Decrement Button
+            const decrementBtn = document.createElement('button');
+            decrementBtn.className = 'w-10 h-10 bg-gray-600 text-white rounded-full text-2xl font-bold transition hover:opacity-80 shadow-md';
+            decrementBtn.textContent = '-';
+            decrementBtn.title = '카운트 1 감소 (길게 누르면 반복)';
+            setupCounterEvents(decrementBtn, charId, fieldName, 'decrement'); 
+
+            // Increment Button
+            const incrementBtn = document.createElement('button');
+            incrementBtn.className = 'w-10 h-10 bg-accent-blue text-white rounded-full text-2xl font-bold transition hover:opacity-80 shadow-md';
+            incrementBtn.textContent = '+';
+            incrementBtn.title = '카운트 1 증가 (길게 누르면 반복)';
+            setupCounterEvents(incrementBtn, charId, fieldName, 'increment'); 
+
+            // Individual Reset Button (Retains simple click behavior)
+            const resetIndividualBtn = document.createElement('button');
+            resetIndividualBtn.className = 'w-10 h-10 bg-gray-700 text-white rounded-full text-xl font-bold transition hover:opacity-80 shadow-md';
+            resetIndividualBtn.innerHTML = '&#128472;'; // 🔄 Unicode
+            resetIndividualBtn.title = `${title} 카운트 0으로 초기화`;
+            resetIndividualBtn.onclick = () => handleCountAction(charId, fieldName, 'reset');
+
+
+            controls.appendChild(decrementBtn);
+            controls.appendChild(countEl);
+            controls.appendChild(incrementBtn);
+            controls.appendChild(resetIndividualBtn); 
+            
+            section.appendChild(titleEl);
+            section.appendChild(controls);
+            
+            return section;
+        };
+
+
+        // --- Reward Calculation Logic (Settlement View) ---
+
+        const calculateRewards = () => {
+            let totalFragments = 0;
+            let totalFeathers = 0;
+            const rewardPerCharacter = [];
+
+            characters.forEach(char => {
+                // Calculate batches for weekly rewards (10 per batch)
+                const weeklyBatches = Math.floor(char.weeklyCount / REWARD_RULES.weekly.divisor);
+                totalFragments += weeklyBatches * REWARD_RULES.weekly.fragments;
+                totalFeathers += weeklyBatches * REWARD_RULES.weekly.feathers;
+
+                // Calculate batches for monthly rewards (30 per batch)
+                const monthlyBatches = Math.floor(char.monthlyCount / REWARD_RULES.monthly.divisor);
+                totalFragments += monthlyBatches * REWARD_RULES.monthly.fragments;
+
+                rewardPerCharacter.push({
+                    name: char.name,
+                    weeklyBatches: weeklyBatches,
+                    monthlyBatches: monthlyBatches,
+                    fragments: (weeklyBatches * REWARD_RULES.weekly.fragments) + (monthlyBatches * REWARD_RULES.monthly.fragments),
+                    feathers: weeklyBatches * REWARD_RULES.weekly.feathers
+                });
+            });
+
+            // Calculate total gold value
+            const totalGold = (totalFragments * itemPrices.fragmentPrice) + (totalFeathers * itemPrices.featherPrice);
+
+            return {
+                totalFragments,
+                totalFeathers,
+                totalGold,
+                rewardPerCharacter
+            };
+        };
+
+        // --- UI Rendering Functions (Settlement View) ---
+        
+        const formatNumber = (num) => {
+            // Use Intl.NumberFormat for locale-specific formatting (Korean convention for large numbers)
+            return new Intl.NumberFormat('ko-KR').format(num);
+        };
+
+        const renderSettlement = () => {
+            const settlementContainer = document.getElementById('settlement-content');
+            if (!settlementContainer || currentView !== 'settlement') return;
+            
+            const rewards = calculateRewards();
+
+            settlementContainer.innerHTML = `
+                <div class="space-y-8">
+                    
+                    <!-- 1. Price Input Section -->
+                    <div class="bg-primary-theme p-6 rounded-xl shadow-inner border border-theme">
+                        <h3 class="text-xl font-bold mb-4 text-accent-blue">💰 아이템 현재 가격 입력</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- 봉힘파 가격 -->
+                            <div class="flex flex-col">
+                                <label for="fragment-price" class="text-subtle-theme text-sm font-medium mb-1">봉인된 힘의 파편 (봉힘파) 개당 가격 (골드)</label>
+                                <input type="number" id="fragment-price"
+                                    value="${itemPrices.fragmentPrice}" min="0" step="1000"
+                                    placeholder="봉힘파 개당 가격"
+                                    class="theme-input p-3 rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none text-xl font-bold"
+                                    oninput="handlePriceChange('fragmentPrice', this.value)">
+                            </div>
+                            <!-- 고강비 가격 -->
+                            <div class="flex flex-col">
+                                <label for="feather-price" class="text-subtle-theme text-sm font-medium mb-1">고급 강화의 비약 (고강비) 개당 가격 (골드)</label>
+                                <input type="number" id="feather-price"
+                                    value="${itemPrices.featherPrice}" min="0" step="1000"
+                                    placeholder="고강비 개당 가격"
+                                    class="theme-input p-3 rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none text-xl font-bold"
+                                    oninput="handlePriceChange('featherPrice', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 2. Total Reward Summary -->
+                    <div class="bg-secondary-theme p-6 rounded-xl shadow-lg border border-theme">
+                        <h3 class="text-2xl font-bold mb-4">🏆 전체 정산 결과</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                            
+                            <!-- 총 봉힘파 -->
+                            <div class="p-4 bg-primary-theme rounded-lg border border-theme">
+                                <p class="text-subtle-theme text-sm">총 봉힘파 수량</p>
+                                <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalFragments)}개</p>
+                            </div>
+
+                            <!-- 총 고강비 -->
+                            <div class="p-4 bg-primary-theme rounded-lg border border-theme">
+                                <p class="text-subtle-theme text-sm">총 고강비 수량</p>
+                                <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalFeathers)}개</p>
+                            </div>
+
+                            <!-- 총 골드 가치 -->
+                            <div class="p-4 bg-primary-theme rounded-lg border border-theme col-span-1 sm:col-span-1">
+                                <p class="text-subtle-theme text-sm">총 예상 골드 가치</p>
+                                <p class="text-3xl font-extrabold text-green-500">${formatNumber(rewards.totalGold)}G</p>
+                            </div>
+                        </div>
+                        <p class="text-xs text-subtle-theme mt-4">* 이 금액은 입력된 아이템 가격에 기반한 예상치입니다.</p>
+                    </div>
+
+                    <!-- 3. Character Breakdown Table -->
+                    <div class="bg-primary-theme p-6 rounded-xl shadow-lg border border-theme">
+                        <h3 class="text-2xl font-bold mb-4">캐릭터별 상세 정산</h3>
+                        
+                        ${rewards.rewardPerCharacter.length > 0 ? `
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-theme">
+                                <thead class="bg-secondary-theme">
+                                    <tr>
+                                        <th class="px-3 py-3 text-left text-xs font-medium text-subtle-theme uppercase tracking-wider rounded-tl-lg">캐릭터 이름</th>
+                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">주간 정산 횟수</th>
+                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">월간 정산 횟수</th>
+                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">봉힘파 총량</th>
+                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider rounded-tr-lg">고강비 총량</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-theme">
+                                    ${rewards.rewardPerCharacter.map(char => `
+                                        <tr class="hover:bg-secondary-theme transition duration-150">
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm font-medium">${char.name}</td>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center">${char.weeklyBatches}회</td>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center">${char.monthlyBatches}회</td>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center font-semibold text-pin-highlight">${formatNumber(char.fragments)}</td>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center font-semibold text-pin-highlight">${formatNumber(char.feathers)}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        ` : `<p class="text-subtle-theme text-center p-4">등록된 캐릭터가 없어 정산할 수 없습니다.</p>`}
+
+                        <p class="text-sm text-subtle-theme mt-4">
+                            정산 기준: 주간 10회 = 봉힘파 50 + 고강비 20 / 월간 30회 = 봉힘파 100
+                        </p>
+                    </div>
+                </div>
+            `;
+        };
+        
+        // NEW: Handler for price input changes
+        window.handlePriceChange = (key, value) => {
+            const numValue = parseInt(value, 10);
+            itemPrices[key] = isNaN(numValue) || numValue < 0 ? 0 : numValue;
+            savePrices(); // Save the new price and re-render settlement view
+        };
+        
+        // --- Data Manipulation Functions ---
+        const addCharacter = (name) => {
+            const newId = Date.now();  
+            const newCharacter = {
+                id: newId,
+                name: name,
+                weeklyCount: 0,
+                monthlyCount: 0,
+                isCompleted: false,  
+                isPinned: false,
+                lastUpdated: newId,  
+                orderIndex: characters.length
+            };
+            characters.push(newCharacter);
+            saveToLocalStorage(); // Save and render
+        };
+
+        const toggleCompletion = (charId) => {
+            const charIndex = characters.findIndex(char => char.id === charId);
+            if (charIndex === -1) {
+                showNotification("캐릭터 정보를 찾을 수 없습니다.");
+                return;
+            }
+
+            characters[charIndex].isCompleted = !characters[charIndex].isCompleted;
+            saveToLocalStorage();
+        };
+
+        // Toggle Pin Function
+        const togglePin = (charId) => {
+            const charIndex = characters.findIndex(char => char.id === charId);
+            if (charIndex === -1) {
+                showNotification("캐릭터 정보를 찾을 수 없습니다.");
+                return;
+            }
+
+            const isPinning = !characters[charIndex].isPinned;
+            characters[charIndex].isPinned = isPinning;
+            reindexCharacters(); 
+            
+            saveToLocalStorage();
+            showNotification(isPinning ? `'${characters[charIndex].name}'을(를) 상단에 고정했습니다.` : `'${characters[charIndex].name}' 고정을 해제했습니다.`, 'info');
+        };
+
+        const handleCountAction = (charId, fieldName, action) => {
+            const charIndex = characters.findIndex(char => char.id === charId);
+            if (charIndex === -1) {
+                console.error("Character not found for ID:", charId);
+                return;
+            }
+            
+            const data = characters[charIndex];
+            const MONTHLY_CAP = 30;
+            let updated = false;
+
+            if (fieldName === 'weeklyCount') {
+                if (action === 'increment') {
+                    data.weeklyCount += 1;
+                    updated = true;
+                    
+                    if (data.monthlyCount < MONTHLY_CAP) {
+                        data.monthlyCount = Math.min(data.monthlyCount + 1, MONTHLY_CAP);
+                    } else if (data.monthlyCount === MONTHLY_CAP && data.weeklyCount === 1) {
+                        showNotification(`월간 냥골 카운트가 최대치(${MONTHLY_CAP})에 도달했습니다.`, 'info');
+                    }
+                } else if (action === 'decrement') { 
+                    if (data.weeklyCount > 0) {
+                        data.weeklyCount -= 1;
+                        updated = true;
+                        
+                        if (data.monthlyCount > 0) {
+                            data.monthlyCount -= 1;
+                        }
+                    }
+                } else if (action === 'reset') { 
+                    if (data.weeklyCount !== 0) {
+                        data.weeklyCount = 0;
+                        updated = true;
+                    }
+                }
+            } else if (fieldName === 'monthlyCount') {
+                if (action === 'increment') {
+                    const newMonthlyCount = Math.min(data.monthlyCount + 1, MONTHLY_CAP);
+                    
+                    if (newMonthlyCount !== data.monthlyCount) {
+                        data.monthlyCount = newMonthlyCount;
+                        updated = true;
+
+                        if (newMonthlyCount === MONTHLY_CAP) {
+                            showNotification(`월간 냥골 카운트가 최대치(${MONTHLY_CAP})에 도달했습니다.`, 'info');
+                        }
+                    }
+                } else if (action === 'decrement') { 
+                    if (data.monthlyCount > 0) {
+                        data.monthlyCount -= 1;
+                        updated = true;
+                    }
+                } else if (action === 'reset') { 
+                    if (data.monthlyCount !== 0) {
+                        data.monthlyCount = 0;
+                        updated = true;
+                    }
+                }
+            }
+
+            if (updated) {
+                saveToLocalStorage(); 
+            }
+        };
+
+        const deleteCharacter = async (charId, charName) => {
+            const confirmed = await window.confirm(`정말로 캐릭터 '${charName}'을(를) 삭제하시겠습니까?`);
+            if (!confirmed) {
+                return;
+            }
+
+            const initialLength = characters.length;
+            characters = characters.filter(char => char.id !== charId);
+
+            if (characters.length < initialLength) {
+                saveToLocalStorage(); // Reindexes and saves
+                showNotification(`캐릭터 '${charName}'이(가) 삭제되었습니다.`, 'success');
+            } else {
+                showNotification("캐릭터 삭제에 실패했습니다.", 'error');
+            }
+        };
+        
+        // Resets only weekly/monthly counts for all characters.
+        const resetAllData = async () => {
+            const confirmed = await window.confirm("경고: 모든 캐릭터의 주간/월간 냥골 카운트가 0으로 초기화됩니다. 계속하시겠습니까?");
+            
+            if (!confirmed) {
+                return;
+            }
+
+            if (characters.length === 0) {
+                showNotification("초기화할 캐릭터가 없습니다.", 'info');
+                return;
+            }
+            
+            characters = characters.map(char => ({
+                ...char,
+                weeklyCount: 0,
+                monthlyCount: 0,
+            }));
+
+            saveToLocalStorage(); 
+            showNotification("모든 캐릭터의 냥골 카운트가 초기화되었습니다.", 'success');
+        };
+
+        // --- Drag and Drop Handlers ---
+        
+        const handleDragStart = (e) => {
+            const card = getCardElement(e.target);
+            if (!card) return;
+
+            draggedElement = card;
+            e.dataTransfer.setData('text/plain', card.dataset.id); 
+
+            setTimeout(() => {
+                card.classList.add('opacity-40', 'drag-shadow');
+            }, 0);
+        };
+
+        const handleDragOver = (e) => {
+            e.preventDefault();
+            const targetCard = getCardElement(e.target);
+            if (!targetCard || targetCard === draggedElement) return;
+
+            const characterList = document.getElementById('character-list');
+            const boundingBox = targetCard.getBoundingClientRect();
+            const offset = boundingBox.y + (boundingBox.height / 2);
+
+            if (e.clientY < offset) {
+                characterList.insertBefore(draggedElement, targetCard);
+            } else {
+                characterList.insertBefore(draggedElement, targetCard.nextSibling);
+            }
+        };
+
+        const handleDragEnd = (e) => {
+            const card = getCardElement(e.target);
+            if (card) {
+                card.classList.remove('opacity-40', 'drag-shadow');
+            }
+            draggedElement = null;
+        };
+
+        const handleDrop = (e) => {
+            e.preventDefault();
+            if (!draggedElement) return;
+
+            // 1. Get the final DOM order
+            const listChildren = Array.from(document.getElementById('character-list').children);
+            const newOrderIds = listChildren.map(child => Number(child.dataset.id));
+            
+            // 2. Map the new DOM order back to the characters array and reassign orderIndex
+            const characterMap = characters.reduce((map, char) => {
+                map[char.id] = char;
+                return map;
+            }, {});
+
+            let newCharacters = [];
+            newOrderIds.forEach((id, index) => {
+                const char = characterMap[id];
+                if (char) {
+                    char.orderIndex = index;
+                    newCharacters.push(char);
+                }
+            });
+
+            // 3. Replace the global array and save
+            characters = newCharacters;
+            saveToLocalStorage();
+            
+            showNotification("캐릭터 순서가 드래그 앤 드롭으로 변경되었습니다.", 'info');
+        };
+        // --- End Drag and Drop Handlers ---
+
+
+        // --- Hold-to-Repeat Event Setup ---
+        const setupCounterEvents = (button, charId, fieldName, action) => {
+            const startRepeat = (e) => {
+                if (e.type === 'mousedown' && e.button !== 0) return; 
+                if (e.type === 'touchstart') e.preventDefault();
+
+                stopRepeat(); 
+
+                // 1. Execute the action immediately on press/touch start
+                handleCountAction(charId, fieldName, action);
+
+                // 2. Set timeout for the initial delay before repetition starts
+                repeatTimeout = setTimeout(() => {
+                    // 3. Start the repeating interval after the initial delay
+                    repeatTimer = setInterval(() => {
+                        handleCountAction(charId, fieldName, action);
+                    }, REPEAT_RATE);
+                }, INITIAL_DELAY);
+            };
+
+            const stopAction = () => {
+                stopRepeat();
+            };
+
+            // Start: mouse down or touch start
+            button.addEventListener('mousedown', startRepeat);
+            button.addEventListener('touchstart', startRepeat);
+
+            // Stop: mouse up, mouse leave (for desktop), touch end, touch cancel
+            button.addEventListener('mouseup', stopAction);
+            button.addEventListener('mouseleave', stopAction); 
+            button.addEventListener('touchend', stopAction);
+            button.addEventListener('touchcancel', stopAction);
+        };
+
+        // --- Event Handlers ---
+        window.onload = () => {
+            loadTheme();
+            loadFromLocalStorage();
+
+            // Set initial view and button handler
+            window.switchView('tracker'); 
+
+            // Add global drag/drop handlers to the list container
+            const characterListDiv = document.getElementById('character-list');
+            characterListDiv.addEventListener('dragover', handleDragOver);
+            characterListDiv.addEventListener('drop', handleDrop);
+
+            // 메모 입력 이벤트 리스너 설정
+            const memoInput = document.getElementById('memo-input');
+            if (memoInput) {
+                memoInput.addEventListener('input', () => {
+                    localStorage.setItem(MEMO_KEY, memoInput.value);
+                });
+            }
+
+            const charForm = document.getElementById('add-char-form');
+            charForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const nameInput = document.getElementById('char-name-input');
+                const name = nameInput.value.trim();
+                
+                if (name) {
+                    addCharacter(name);
+                    nameInput.value = ''; // Clear input
+                    showNotification(`'${name}' 캐릭터가 추가되었습니다.`, 'success');
+                } else {
+                    showNotification("캐릭터 이름을 입력해주세요.");
+                }
+            });
+            
+            // 전체 초기화 버튼 이벤트 리스너
+            const resetButton = document.getElementById('reset-all-button');
+            if (resetButton) {
+                resetButton.addEventListener('click', resetAllData);
+            }
+        };
+
+        // --- Custom Notification/Modal (Replacing alert/confirm) ---
+        const showNotification = (message, type = 'info') => {
+            const notification = document.getElementById('notification-box');
+            notification.textContent = message;
+            
+            // Color based on type
+            notification.className = `fixed bottom-4 right-4 p-3 rounded-lg shadow-xl text-white transition-all duration-300 transform translate-y-full opacity-0 z-50`;
+            if (type === 'success') {
+                notification.classList.add('bg-green-600');
+            } else if (type === 'error') {
+                notification.classList.add('bg-red-600');
+            } else {
+                notification.classList.add('bg-gray-800');
+            }
+
+            // Show notification
+            setTimeout(() => {
+                notification.classList.remove('translate-y-full', 'opacity-0');
+                notification.classList.add('translate-y-0', 'opacity-100');
+            }, 50);
+
+            // Hide notification after 3 seconds
+            setTimeout(() => {
+                notification.classList.remove('translate-y-0', 'opacity-100');
+                notification.classList.add('translate-y-full', 'opacity-0');
+            }, 3000);
+        };
+        
+        // Custom window.confirm implementation (simple modal)
+        window.confirm = (message) => {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('confirmation-modal');
+                const modalMessage = document.getElementById('modal-message');
+                const confirmBtn = document.getElementById('modal-confirm');
+                const cancelBtn = document.getElementById('modal-cancel');
+
+                modalMessage.textContent = message;
+                modal.classList.remove('hidden');
+
+                const cleanUp = () => {
+                    modal.classList.add('hidden');
+                    confirmBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                };
+
+                confirmBtn.onclick = () => {
+                    cleanUp();
+                    resolve(true);
+                };
+
+                cancelBtn.onclick = () => {
+                    cleanUp();
+                    resolve(false);
+                };
+            });
+        };
+
+    </script>
+    <style>
+        /* CSS Variables for Theming */
+        :root {
+            /* Dark Theme Defaults */
+            --bg-page: #111827; /* gray-900 equivalent */
+            --bg-primary: #1e293b; /* slate-800 */
+            --bg-secondary: #334155; /* slate-700 */
+            --color-text: #ffffff;
+            --color-text-subtle: #9ca3af; /* gray-400 */
+            --color-border: #374151; /* gray-700 */
+            --color-accent: #3b82f6; /* accent-blue */
+            --color-reset: #ef4444; /* accent-red */
+            /* NEW: Pin Highlight Color */
+            --color-pin-highlight: #facc15; /* yellow-400 for dark mode */
+            --color-pin-shadow: 247, 243, 195; /* R G B for yellow-100/200 effect */
+        }
+
+        .light-theme {
+            /* Light Theme Overrides */
+            --bg-page: #f3f4f6; /* gray-100 */
+            --bg-primary: #ffffff; /* white */
+            --bg-secondary: #e5e7eb; /* gray-200 */
+            --color-text: #1f2937; /* gray-900 */
+            --color-text-subtle: #6b7280; /* gray-500 */
+            --color-border: #d1d5db; /* gray-300 */
+            --color-accent: #1d4ed8; /* blue-700 */
+            --color-reset: #b91c1c; /* red-700 */
+            /* NEW: Pin Highlight Color for light mode (dark gray) */
+            --color-pin-highlight: #1f2937; /* gray-800 for light mode */
+            --color-pin-shadow: 31, 41, 55; /* R G B for gray-800/900 effect */
+        }
+        
+        /* Apply CSS variables to common elements */
+        body {
+            background-color: var(--bg-page);
+            color: var(--color-text);
+        }
+
+        .bg-primary-theme { background-color: var(--bg-primary); }
+        .bg-secondary-theme { background-color: var(--bg-secondary); }
+        .text-subtle-theme { color: var(--color-text-subtle); }
+        .border-theme { border-color: var(--color-border); }
+        
+        /* Theme overrides for hardcoded Tailwind classes using CSS variables */
+        .text-accent-blue { color: var(--color-accent); }
+        .bg-accent-blue { background-color: var(--color-accent); }
+        .hover\:bg-blue-600:hover { background-color: var(--color-accent); opacity: 0.8; }
+        
+        .text-accent-red { color: var(--color-reset); }
+        .bg-accent-red { background-color: var(--color-reset); }
+        .hover\:bg-red-600:hover { background-color: var(--color-reset); opacity: 0.8; }
+        
+        /* Input and Textarea styling */
+        .theme-input {
+            background-color: var(--bg-primary); 
+            border-width: 1px;
+            border-color: var(--color-border);
+            color: var(--color-text);
+        }
+        .theme-input::placeholder { color: var(--color-text-subtle); }
+        
+        /* Custom scrollbar for theme */
+        body::-webkit-scrollbar { width: 8px; }
+        body::-webkit-scrollbar-track { background: var(--bg-page); }
+        body::-webkit-scrollbar-thumb { background: var(--bg-secondary); border-radius: 4px; }
+        body::-webkit-scrollbar-thumb:hover { background: var(--color-text-subtle); }
+        
+        /* Drag and Drop Visuals */
+        .drag-shadow {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Pinned Item Highlighting using CSS Variables */
+        .text-pin-highlight {
+            color: var(--color-pin-highlight);
+        }
+        .border-pin-highlight {
+            border-color: var(--color-pin-highlight);
+            box-shadow: 0 4px 6px -1px rgba(var(--color-pin-shadow), 0.1), 0 2px 4px -2px rgba(var(--color-pin-shadow), 0.06);
+        }
+        
+    </style>
+</head>
+<body class="min-h-screen font-sans p-4 sm:p-8">
+
+    <!-- Confirmation Modal Structure -->
+    <div id="confirmation-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-50 flex items-center justify-center">
+        <div class="bg-secondary-theme p-6 rounded-xl shadow-2xl max-w-sm w-full border border-theme">
+            <p id="modal-message" class="text-lg font-semibold mb-6"></p>
+            <div class="flex justify-end space-x-3">
+                <button id="modal-cancel" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition shadow-md">취소</button>
+                <button id="modal-confirm" class="px-4 py-2 bg-accent-red text-white rounded-lg hover:bg-red-600 transition shadow-md">확인</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification Box -->
+    <div id="notification-box" class="fixed bottom-4 right-4 p-3 rounded-lg shadow-xl text-white transition-all duration-300 transform translate-y-full opacity-0 z-50">
+        <!-- Notification message will be inserted here -->
+    </div>
+
+    <div id="app-container" class="max-w-4xl mx-auto">
+        
+        <!-- Header with Theme Toggle and View Toggle -->
+        <header class="text-center mb-8 flex flex-col sm:flex-row justify-center sm:justify-between items-center relative">
+            
+            <!-- View Toggle Button (NEW) -->
+            <button id="view-toggle-button" onclick="switchView('settlement')" 
+                    class="order-2 sm:order-1 mt-4 sm:mt-0 px-4 py-2 bg-accent-blue text-white font-semibold rounded-lg hover:opacity-80 transition shadow-lg w-full sm:w-auto text-sm">
+                💰 정산표 보기
+            </button>
+
+            <div class="text-center order-1 sm:order-2">
+                <h1 class="text-4xl font-extrabold text-accent-blue mb-2">냥골 던전 숙제 트래커</h1>
+                <p class="text-subtle-theme">캐릭터별 주간/월간 클리어 횟수 및 보상 정산</p>
+            </div>
+            
+            <!-- Theme Toggle Button -->
+            <button id="theme-toggle" onclick="toggleTheme()" class="order-3 absolute top-0 right-0 sm:static p-2 rounded-full bg-secondary-theme hover:opacity-80 transition shadow-lg text-2xl" title="테마 전환">
+                <span id="theme-icon">☀️</span>
+            </button>
+        </header>
+
+        <!-- User Info & Disclaimer -->
+        <div class="mb-6 bg-primary-theme p-4 rounded-xl shadow border border-theme">
+            <p id="user-info" class="text-sm text-subtle-theme">데이터를 로드 중입니다...</p>
+            <p class="text-xs text-blue-500 mt-1">※ 데이터는 현재 브라우저의 로컬 저장소에 저장되므로, 다른 브라우저에서는 접근할 수 없습니다.</p>
+        </div>
+        
+        <!-- --- TRACKER VIEW CONTENT --- -->
+        <div id="tracker-view">
+            <!-- Memo Section (Collapsible) -->
+            <details class="mb-8 p-6 bg-secondary-theme rounded-xl shadow-lg border border-theme">
+                <summary class="text-2xl font-bold cursor-pointer select-none">
+                    📝 메모/자유 기록 (여기를 클릭하여 열고 닫기)
+                </summary>
+                <textarea id="memo-input" 
+                            class="theme-input w-full h-32 mt-4 p-3 border rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none"
+                            placeholder="여기에 자유롭게 메모를 입력하세요. (브라우저에 자동 저장됩니다.)"
+                ></textarea>
+            </details>
+
+            <!-- Add Character Form -->
+            <div class="mb-8 p-6 bg-secondary-theme rounded-xl shadow-lg border border-theme">
+                <h2 class="text-2xl font-bold mb-4">새 캐릭터 추가</h2>
+                <form id="add-char-form" class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                    <input 
+                        type="text" 
+                        id="char-name-input" 
+                        placeholder="캐릭터 이름 (예: 사냐)"
+                        required
+                        class="theme-input flex-grow p-3 border rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none"
+                    >
+                    <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-accent-blue text-white font-semibold rounded-lg hover:bg-blue-600 transition shadow-lg">
+                        캐릭터 추가
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Count Reset Section (Compact) -->
+            <div class="mb-8 p-3 bg-primary-theme rounded-xl shadow-lg border border-theme flex flex-col sm:flex-row items-center justify-between">
+                <span class="text-sm font-semibold text-subtle-theme mb-2 sm:mb-0">전체 카운트 초기화 (주간/월간)</span>
+                <button id="reset-all-button" class="w-full sm:w-auto px-4 py-2 bg-accent-red text-white text-sm font-semibold rounded-lg hover:bg-red-600 transition shadow-lg">
+                    🔄 모두 리셋
+                </button>
+            </div>
+
+            <!-- Character List -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4 border-b border-theme pb-2">캐릭터 현황 (드래그 앤 드롭으로 순서 변경 가능)</h2>
+                <div id="character-list" class="space-y-4">
+                    <p class="text-subtle-theme p-4 text-center">캐릭터 데이터를 로드 중입니다...</p>
+                </div>
+            </section>
+        </div>
+        
+        <!-- --- SETTLEMENT VIEW CONTENT (NEW) --- -->
+        <div id="settlement-view" class="hidden">
+            <h2 class="text-3xl font-extrabold mb-6 border-b border-theme pb-2 text-blue">💰 보상 정산표</h2>
+            <div id="settlement-content">
+                <!-- Settlement details will be rendered here by renderSettlement() -->
+                <p class="text-subtle-theme p-4 text-center">정산표 데이터를 로드 중입니다...</p>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
