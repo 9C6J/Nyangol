@@ -17,6 +17,7 @@
         const THEME_KEY = 'nyangolTheme';
         const PRICE_KEY = 'nyangolItemPrices'; // Price storage key
         const LAYOUT_KEY = 'nyangolLayoutV1';
+        const MOTION_KEY = 'nyangolMotionEnabled';
 
         // Reward Rules
         const REWARD_RULES = {
@@ -146,9 +147,10 @@
         let itemPrices = DEFAULT_PRICES;
         let currentView = 'tracker';
         let isLayoutEditMode = false;
+        let isMotionEnabled = true;
 
         // Drag and Drop Globals
-        let draggedElement = null; 
+        let draggedElement = null;
         let draggedSectionElement = null;
 
         // Repeat/Hold Logic Globals
@@ -156,6 +158,8 @@
         let repeatTimeout = null;
         const INITIAL_DELAY = 500;
         const REPEAT_RATE = 100;
+        const DRAG_SCROLL_EDGE_PX = 96;
+        const DRAG_SCROLL_STEP_PX = 18;
 
         // Clears the repeating interval and initial timeout
         const stopRepeat = () => {
@@ -163,6 +167,15 @@
             if (repeatTimer) {
                 clearInterval(repeatTimer);
                 repeatTimer = null;
+            }
+        };
+
+        const autoScrollDuringDrag = (clientY) => {
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+            if (clientY < DRAG_SCROLL_EDGE_PX) {
+                window.scrollBy(0, -DRAG_SCROLL_STEP_PX);
+            } else if (clientY > viewportHeight - DRAG_SCROLL_EDGE_PX) {
+                window.scrollBy(0, DRAG_SCROLL_STEP_PX);
             }
         };
 
@@ -296,7 +309,7 @@
                     characters = [];
                 }
             }
-            
+
             // Memo load and UI reflection
             const storedMemo = localStorage.getItem(MEMO_KEY);
             const memoInput = document.getElementById('memo-input');
@@ -309,7 +322,7 @@
             renderCharacters(); // Initial render for tracker view
             loadPrices(); // Load item prices
         };
-        
+
         // Function to re-assign continuous orderIndex to all characters
         const reindexCharacters = () => {
             // 1. First, sort by the desired visual order (pinned, then current orderIndex)
@@ -329,7 +342,7 @@
         };
 
         // --- Local Storage Management (Prices) ---
-        
+
         const loadPrices = () => {
             const storedPrices = localStorage.getItem(PRICE_KEY);
             if (storedPrices) {
@@ -355,7 +368,7 @@
         const applyThemeLegacy = (theme) => {
             const body = document.body;
             const toggleButton = document.getElementById('theme-icon');
-            
+
             if (theme === 'light') {
                 body.classList.add('light-theme');
                 if (toggleButton) {
@@ -376,12 +389,12 @@
             const currentTheme = localStorage.getItem(THEME_KEY) === 'light' ? 'dark' : 'light';
             applyTheme(currentTheme);
         };
-        
+
         const loadThemeLegacy = () => {
             const savedTheme = localStorage.getItem(THEME_KEY) || 'dark'; // Default to dark
             applyTheme(savedTheme);
         };
-        
+
         const applyTheme = (theme) => {
             const body = document.body;
             const root = document.documentElement;
@@ -413,20 +426,46 @@
             const nextTheme = ACTIVE_THEME_KEYS[(safeIndex + 1) % ACTIVE_THEME_KEYS.length];
             applyTheme(nextTheme);
         };
-        
+
         const loadTheme = () => {
             const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
             applyTheme(ACTIVE_THEME_KEYS.includes(savedTheme) ? savedTheme : 'dark');
         };
 
+        const applyMotionPreference = (enabled) => {
+            isMotionEnabled = enabled;
+            document.body.dataset.motion = enabled ? 'on' : 'off';
+            localStorage.setItem(MOTION_KEY, enabled ? 'true' : 'false');
+
+            const toggleButton = document.getElementById('motion-toggle');
+            if (toggleButton) {
+                toggleButton.textContent = enabled ? 'Animation ON' : 'Animation OFF';
+                toggleButton.title = enabled ? 'Turn animation off' : 'Turn animation on';
+            }
+        };
+
+        window.toggleMotionEffects = () => {
+            applyMotionPreference(!isMotionEnabled);
+        };
+
+        const loadMotionPreference = () => {
+            const saved = localStorage.getItem(MOTION_KEY);
+            if (saved === null) {
+                const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                applyMotionPreference(!prefersReduced);
+                return;
+            }
+            applyMotionPreference(saved === 'true');
+        };
+
         // --- View Switching ---
-        
+
         window.switchView = (viewId) => {
             const trackerView = document.getElementById('tracker-view');
             const settlementView = document.getElementById('settlement-view');
             const toggleButton = document.getElementById('view-toggle-button');
             const layoutEditButton = document.getElementById('layout-edit-toggle');
-            
+
             currentView = viewId;
 
             if (viewId === 'settlement') {
@@ -486,7 +525,7 @@
             const isWeeklyGoalReached = data.weeklyCount >= REWARD_RULES.weekly.divisor;
             const isMonthlyGoalReached = data.monthlyCount >= REWARD_RULES.monthly.divisor;
             const isGoalReached = isWeeklyGoalReached || isMonthlyGoalReached;
-            
+
             const card = document.createElement('div');
             const pinBorderClass = data.isPinned ? 'border-pin-highlight shadow-lg' : 'hover:border-accent-blue';
             const cardCursorClass = isLayoutEditMode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing';
@@ -505,8 +544,8 @@
 
             // 1. Name, Completion Checkbox, Pin, and ID
             const nameSection = document.createElement('div');
-            nameSection.className = 'flex flex-col items-center sm:items-start w-full sm:w-[25%] min-w-[150px]'; 
-            
+            nameSection.className = 'flex flex-col items-center sm:items-start w-full sm:w-[25%] min-w-[150px]';
+
             // Check weekly count for visual highlight (FEATURE 1)
             const isWeeklyOver5 = data.weeklyCount >= 5;
             const weeklyHighlightClass = isWeeklyGoalReached
@@ -518,33 +557,33 @@
 
             const nameControls = document.createElement('div');
             nameControls.className = 'flex items-center space-x-2';
-            
+
             // Checkbox (DESIGN IMPROVEMENT APPLIED)
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             // Bolder, slightly larger, and more rounded checkbox style
             // Note: Relying on browser default checkmark and Tailwind's ability to style the box.
-            checkbox.className = 'h-6 w-6 text-green-500 bg-secondary-theme border-2 border-theme rounded-lg focus:ring-green-500 cursor-pointer flex-shrink-0'; 
+            checkbox.className = 'h-6 w-6 text-green-500 bg-secondary-theme border-2 border-theme rounded-lg focus:ring-green-500 cursor-pointer flex-shrink-0';
             checkbox.checked = data.isCompleted;
             checkbox.title = '숙제 완료 체크';
             checkbox.onchange = () => toggleCompletion(charId);
 
             // Pin Button
             const pinButton = document.createElement('button');
-            const pinIcon = data.isPinned ? '📌' : '📍'; 
+            const pinIcon = data.isPinned ? '📌' : '📍';
             const pinColorClass = data.isPinned ? 'text-pin-highlight' : 'text-subtle-theme hover:text-pin-highlight';
             pinButton.className = `p-1 rounded-full text-lg transition duration-150 ${pinColorClass}`;
             pinButton.innerHTML = pinIcon;
             pinButton.title = data.isPinned ? '고정 해제' : '상단 고정';
             pinButton.onclick = (e) => {
-                e.stopPropagation(); 
+                e.stopPropagation();
                 togglePin(charId);
             };
 
             const nameEl = document.createElement('p');
             const nameTextColor = data.isPinned ? 'text-pin-highlight' : '';
             // FEATURE 2 REVERTED: Removed clickable classes and handler.
-            nameEl.className = `text-xl font-bold ${data.isCompleted ? 'line-through text-subtle-theme' : nameTextColor}`; 
+            nameEl.className = `text-xl font-bold ${data.isCompleted ? 'line-through text-subtle-theme' : nameTextColor}`;
             nameEl.textContent = data.name;
 
             // Name click handler removed (was previously nameEl.onclick)
@@ -588,7 +627,7 @@
             `;
             deleteButton.title = `${data.name} 캐릭터 삭제`;
             deleteButton.onclick = () => deleteCharacter(charId, data.name);
-            
+
             // Combine all sections
             card.appendChild(nameSection);
             card.appendChild(weeklySection);
@@ -657,24 +696,24 @@
 
             return layer;
         };
-        
+
         // Updated function signature to accept highlightClass
         const createCounterSection = (title, count, fieldName, charId, highlightClass) => {
             const section = document.createElement('div');
-            section.className = 'counter-section flex flex-col items-center w-full sm:w-[30%] min-w-[120px]'; 
-            
+            section.className = 'counter-section flex flex-col items-center w-full sm:w-[30%] min-w-[120px]';
+
             // Title
             const titleEl = document.createElement('p');
-            titleEl.className = 'text-sm font-medium text-subtle-theme mb-1 mr-[45px]'; 
+            titleEl.className = 'text-sm font-medium text-subtle-theme mb-1 mr-[45px]';
             titleEl.textContent = title;
-            
+
             // Count Display and Controls
             const controls = document.createElement('div');
             controls.className = 'flex items-center space-x-1.5';
-            
+
             const countEl = document.createElement('span');
             // Use the passed highlightClass directly here (FEATURE 1)
-            countEl.className = `text-3xl font-extrabold w-12 text-center ${highlightClass}`; 
+            countEl.className = `text-3xl font-extrabold w-12 text-center ${highlightClass}`;
             countEl.textContent = String(count).padStart(2, '0');
 
             // Decrement Button
@@ -682,31 +721,33 @@
             decrementBtn.className = 'w-10 h-10 bg-gray-600 text-white rounded-full text-2xl font-bold transition hover:opacity-80 shadow-md';
             decrementBtn.textContent = '-';
             decrementBtn.title = '카운트 1 감소 (길게 누르면 반복)';
-            setupCounterEvents(decrementBtn, charId, fieldName, 'decrement'); 
+            setupCounterEvents(decrementBtn, charId, fieldName, 'decrement');
 
             // Increment Button
             const incrementBtn = document.createElement('button');
             incrementBtn.className = 'w-10 h-10 bg-accent-blue text-white rounded-full text-2xl font-bold transition hover:opacity-80 shadow-md';
             incrementBtn.textContent = '+';
             incrementBtn.title = '카운트 1 증가 (길게 누르면 반복)';
-            setupCounterEvents(incrementBtn, charId, fieldName, 'increment'); 
+            setupCounterEvents(incrementBtn, charId, fieldName, 'increment');
 
-            // Individual Reset Button (Retains simple click behavior)
+            // Individual Reset Button
             const resetIndividualBtn = document.createElement('button');
-            resetIndividualBtn.className = 'w-10 h-10 bg-gray-700 text-white rounded-full text-xl font-bold transition hover:opacity-80 shadow-md';
-            resetIndividualBtn.innerHTML = '&#128472;'; // 🔄 Unicode
+            const resetIcon = fieldName === 'weeklyCount' ? '&#8635;' : '&#128197;';
+            resetIndividualBtn.className = 'w-10 h-10 bg-gray-700 text-white rounded-full text-xl font-bold transition hover:opacity-80 shadow-md border border-transparent hover:border-theme';
+            resetIndividualBtn.innerHTML = resetIcon;
             resetIndividualBtn.title = `${title} 카운트 0으로 초기화`;
+            resetIndividualBtn.setAttribute('aria-label', `${title} 카운트 0으로 초기화`);
             resetIndividualBtn.onclick = () => handleCountAction(charId, fieldName, 'reset');
 
 
             controls.appendChild(decrementBtn);
             controls.appendChild(countEl);
             controls.appendChild(incrementBtn);
-            controls.appendChild(resetIndividualBtn); 
-            
+            controls.appendChild(resetIndividualBtn);
+
             section.appendChild(titleEl);
             section.appendChild(controls);
-            
+
             return section;
         };
 
@@ -749,7 +790,7 @@
         };
 
         // --- UI Rendering Functions (Settlement View) ---
-        
+
         const formatNumber = (num) => {
             // Use Intl.NumberFormat for locale-specific formatting (Korean convention for large numbers)
             return new Intl.NumberFormat('ko-KR').format(num);
@@ -758,12 +799,12 @@
         const renderSettlement = () => {
             const settlementContainer = document.getElementById('settlement-content');
             if (!settlementContainer || currentView !== 'settlement') return;
-            
+
             const rewards = calculateRewards();
 
             settlementContainer.innerHTML = `
                 <div class="space-y-8">
-                    
+
                     <!-- 1. Price Input Section -->
                     <div class="bg-primary-theme p-6 rounded-xl shadow-inner border border-theme">
                         <h3 class="text-xl font-bold mb-4 text-accent-blue">💰 아이템 현재 가격 입력</h3>
@@ -788,12 +829,12 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- 2. Total Reward Summary -->
                     <div class="bg-secondary-theme p-6 rounded-xl shadow-lg border border-theme">
                         <h3 class="text-2xl font-bold mb-4">🏆 전체 정산 결과</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-                            
+
                             <!-- 총 봉힘파 -->
                             <div class="p-4 bg-primary-theme rounded-lg border border-theme">
                                 <p class="text-subtle-theme text-sm">총 봉힘파 수량</p>
@@ -818,7 +859,7 @@
                     <!-- 3. Character Breakdown Table -->
                     <div class="bg-primary-theme p-6 rounded-xl shadow-lg border border-theme">
                         <h3 class="text-2xl font-bold mb-4">캐릭터별 상세 정산</h3>
-                        
+
                         ${rewards.rewardPerCharacter.length > 0 ? `
                         <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-theme">
@@ -853,25 +894,25 @@
                 </div>
             `;
         };
-        
+
         // NEW: Handler for price input changes
         window.handlePriceChange = (key, value) => {
             const numValue = parseInt(value, 10);
             itemPrices[key] = isNaN(numValue) || numValue < 0 ? 0 : numValue;
             savePrices(); // Save the new price and re-render settlement view
         };
-        
+
         // --- Data Manipulation Functions ---
         const addCharacter = (name) => {
-            const newId = Date.now();  
+            const newId = Date.now();
             const newCharacter = {
                 id: newId,
                 name: name,
                 weeklyCount: 0,
                 monthlyCount: 0,
-                isCompleted: false,  
+                isCompleted: false,
                 isPinned: false,
-                lastUpdated: newId,  
+                lastUpdated: newId,
                 orderIndex: characters.length
             };
             characters.push(newCharacter);
@@ -899,8 +940,8 @@
 
             const isPinning = !characters[charIndex].isPinned;
             characters[charIndex].isPinned = isPinning;
-            reindexCharacters(); 
-            
+            reindexCharacters();
+
             saveToLocalStorage();
             showNotification(isPinning ? `'${characters[charIndex].name}'을(를) 상단에 고정했습니다.` : `'${characters[charIndex].name}' 고정을 해제했습니다.`, 'info');
         };
@@ -911,7 +952,7 @@
                 console.error("Character not found for ID:", charId);
                 return;
             }
-            
+
             const data = characters[charIndex];
             const MONTHLY_CAP = REWARD_RULES.monthly.divisor;
             const previousWeeklyCount = data.weeklyCount;
@@ -922,22 +963,22 @@
                 if (action === 'increment') {
                     data.weeklyCount += 1;
                     updated = true;
-                    
+
                     if (data.monthlyCount < MONTHLY_CAP) {
                         data.monthlyCount = Math.min(data.monthlyCount + 1, MONTHLY_CAP);
                     } else if (data.monthlyCount === MONTHLY_CAP && data.weeklyCount === 1) {
                         showNotification(`월간 냥골 카운트가 최대치(${MONTHLY_CAP})에 도달했습니다.`, 'info');
                     }
-                } else if (action === 'decrement') { 
+                } else if (action === 'decrement') {
                     if (data.weeklyCount > 0) {
                         data.weeklyCount -= 1;
                         updated = true;
-                        
+
                         if (data.monthlyCount > 0) {
                             data.monthlyCount -= 1;
                         }
                     }
-                } else if (action === 'reset') { 
+                } else if (action === 'reset') {
                     if (data.weeklyCount !== 0) {
                         data.weeklyCount = 0;
                         updated = true;
@@ -946,7 +987,7 @@
             } else if (fieldName === 'monthlyCount') {
                 if (action === 'increment') {
                     const newMonthlyCount = Math.min(data.monthlyCount + 1, MONTHLY_CAP);
-                    
+
                     if (newMonthlyCount !== data.monthlyCount) {
                         data.monthlyCount = newMonthlyCount;
                         updated = true;
@@ -955,12 +996,12 @@
                             showNotification(`월간 냥골 카운트가 최대치(${MONTHLY_CAP})에 도달했습니다.`, 'info');
                         }
                     }
-                } else if (action === 'decrement') { 
+                } else if (action === 'decrement') {
                     if (data.monthlyCount > 0) {
                         data.monthlyCount -= 1;
                         updated = true;
                     }
-                } else if (action === 'reset') { 
+                } else if (action === 'reset') {
                     if (data.monthlyCount !== 0) {
                         data.monthlyCount = 0;
                         updated = true;
@@ -978,7 +1019,7 @@
                         : `${data.name} 월간 냥골 숙제가 완료되었습니다!`;
                     showNotification(monthlyDoneMessage, 'success');
                 }
-                saveToLocalStorage(); 
+                saveToLocalStorage();
             }
         };
 
@@ -998,39 +1039,56 @@
                 showNotification("캐릭터 삭제에 실패했습니다.", 'error');
             }
         };
-        
-        // Resets only weekly/monthly counts for all characters.
-        const resetAllData = async () => {
-            const confirmed = await window.confirm("경고: 모든 캐릭터의 주간/월간 냥골 카운트가 0으로 초기화됩니다. 계속하시겠습니까?");
-            
-            if (!confirmed) {
-                return;
-            }
+
+        // Resets weekly/monthly counts for all characters by target type.
+        const resetCountsByType = async (type = 'all') => {
+            const messages = {
+                all: {
+                    confirm: "경고: 모든 캐릭터의 주간/월간 냥골 카운트가 0으로 초기화됩니다. 계속하시겠습니까?",
+                    done: "모든 캐릭터의 주간/월간 냥골 카운트가 초기화되었습니다."
+                },
+                weekly: {
+                    confirm: "경고: 모든 캐릭터의 주간 냥골 카운트가 0으로 초기화됩니다. 계속하시겠습니까?",
+                    done: "모든 캐릭터의 주간 냥골 카운트가 초기화되었습니다."
+                },
+                monthly: {
+                    confirm: "경고: 모든 캐릭터의 월간 냥골 카운트가 0으로 초기화됩니다. 계속하시겠습니까?",
+                    done: "모든 캐릭터의 월간 냥골 카운트가 초기화되었습니다."
+                }
+            };
+            const targetType = Object.prototype.hasOwnProperty.call(messages, type) ? type : 'all';
+
+            const confirmed = await window.confirm(messages[targetType].confirm);
+            if (!confirmed) return;
 
             if (characters.length === 0) {
                 showNotification("초기화할 캐릭터가 없습니다.", 'info');
                 return;
             }
-            
-            characters = characters.map(char => ({
+
+            characters = characters.map((char) => ({
                 ...char,
-                weeklyCount: 0,
-                monthlyCount: 0,
+                weeklyCount: targetType === 'monthly' ? char.weeklyCount : 0,
+                monthlyCount: targetType === 'weekly' ? char.monthlyCount : 0,
             }));
 
-            saveToLocalStorage(); 
-            showNotification("모든 캐릭터의 냥골 카운트가 초기화되었습니다.", 'success');
+            saveToLocalStorage();
+            showNotification(messages[targetType].done, 'success');
         };
 
+        const resetAllData = async () => resetCountsByType('all');
+        const resetWeeklyData = async () => resetCountsByType('weekly');
+        const resetMonthlyData = async () => resetCountsByType('monthly');
+
         // --- Drag and Drop Handlers ---
-        
+
         const handleDragStart = (e) => {
             if (isLayoutEditMode) return;
             const card = getCardElement(e.target);
             if (!card) return;
 
             draggedElement = card;
-            e.dataTransfer.setData('text/plain', card.dataset.id); 
+            e.dataTransfer.setData('text/plain', card.dataset.id);
 
             setTimeout(() => {
                 card.classList.add('opacity-40', 'drag-shadow');
@@ -1070,7 +1128,7 @@
             // 1. Get the final DOM order
             const listChildren = Array.from(document.getElementById('character-list').children);
             const newOrderIds = listChildren.map(child => Number(child.dataset.id));
-            
+
             // 2. Map the new DOM order back to the characters array and reassign orderIndex
             const characterMap = characters.reduce((map, char) => {
                 map[char.id] = char;
@@ -1089,7 +1147,7 @@
             // 3. Replace the global array and save
             characters = newCharacters;
             saveToLocalStorage();
-            
+
             showNotification("캐릭터 순서가 드래그 앤 드롭으로 변경되었습니다.", 'info');
         };
         // --- End Drag and Drop Handlers ---
@@ -1109,6 +1167,7 @@
         const handleSectionDragOver = (e) => {
             if (!isLayoutEditMode) return;
             e.preventDefault();
+            autoScrollDuringDrag(e.clientY);
             const targetSection = getLayoutSectionElement(e.target);
             if (!targetSection || targetSection === draggedSectionElement) return;
 
@@ -1148,10 +1207,10 @@
         // --- Hold-to-Repeat Event Setup ---
         const setupCounterEvents = (button, charId, fieldName, action) => {
             const startRepeat = (e) => {
-                if (e.type === 'mousedown' && e.button !== 0) return; 
+                if (e.type === 'mousedown' && e.button !== 0) return;
                 if (e.type === 'touchstart') e.preventDefault();
 
-                stopRepeat(); 
+                stopRepeat();
 
                 // 1. Execute the action immediately on press/touch start
                 handleCountAction(charId, fieldName, action);
@@ -1175,7 +1234,7 @@
 
             // Stop: mouse up, mouse leave (for desktop), touch end, touch cancel
             button.addEventListener('mouseup', stopAction);
-            button.addEventListener('mouseleave', stopAction); 
+            button.addEventListener('mouseleave', stopAction);
             button.addEventListener('touchend', stopAction);
             button.addEventListener('touchcancel', stopAction);
         };
@@ -1183,12 +1242,13 @@
         // --- Event Handlers ---
         window.onload = () => {
             loadTheme();
+            loadMotionPreference();
             loadFromLocalStorage();
             applyTrackerLayout();
             setLayoutEditMode(false);
 
             // Set initial view and button handler
-            window.switchView('tracker'); 
+            window.switchView('tracker');
 
             // Add global drag/drop handlers to the list container
             const characterListDiv = document.getElementById('character-list');
@@ -1227,11 +1287,19 @@
                     showNotification("캐릭터 이름을 입력해주세요.");
                 }
             });
-            
-            // 전체 초기화 버튼 이벤트 리스너
-            const resetButton = document.getElementById('reset-all-button');
-            if (resetButton) {
-                resetButton.addEventListener('click', resetAllData);
+
+            // 전체/주간/월간 초기화 버튼 이벤트 리스너
+            const resetAllButton = document.getElementById('reset-all-button');
+            if (resetAllButton) {
+                resetAllButton.addEventListener('click', resetAllData);
+            }
+            const resetWeeklyButton = document.getElementById('reset-weekly-button');
+            if (resetWeeklyButton) {
+                resetWeeklyButton.addEventListener('click', resetWeeklyData);
+            }
+            const resetMonthlyButton = document.getElementById('reset-monthly-button');
+            if (resetMonthlyButton) {
+                resetMonthlyButton.addEventListener('click', resetMonthlyData);
             }
         };
 
@@ -1239,7 +1307,7 @@
         const showNotification = (message, type = 'info') => {
             const notification = document.getElementById('notification-box');
             notification.textContent = message;
-            
+
             // Color based on type
             notification.className = `fixed bottom-4 right-4 p-3 rounded-lg shadow-xl text-white transition-all duration-300 transform translate-y-full opacity-0 z-50`;
             if (type === 'success') {
@@ -1262,7 +1330,7 @@
                 notification.classList.add('translate-y-full', 'opacity-0');
             }, 3000);
         };
-        
+
         // Custom window.confirm implementation (simple modal)
         window.confirm = (message) => {
             return new Promise((resolve) => {
@@ -1331,7 +1399,7 @@
             --color-pin-highlight: #1f2937; /* gray-800 for light mode */
             --color-pin-shadow: 31, 41, 55; /* R G B for gray-800/900 effect */
         }
-        
+
         /* Apply CSS variables to common elements */
         body {
             background-color: var(--bg-page);
@@ -1342,31 +1410,71 @@
         .bg-secondary-theme { background-color: var(--bg-secondary); }
         .text-subtle-theme { color: var(--color-text-subtle); }
         .border-theme { border-color: var(--color-border); }
-        
+
         /* Theme overrides for hardcoded Tailwind classes using CSS variables */
         .text-accent-blue { color: var(--color-accent); }
         .bg-accent-blue { background-color: var(--color-accent); }
         .hover\:bg-blue-600:hover { background-color: var(--color-accent); opacity: 0.8; }
-        
+
         .text-accent-red { color: var(--color-reset); }
         .bg-accent-red { background-color: var(--color-reset); }
         .hover\:bg-red-600:hover { background-color: var(--color-reset); opacity: 0.8; }
-        
+
+        .reset-quick-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--color-border);
+            color: var(--color-text);
+            font-size: 19px;
+            line-height: 1;
+            box-shadow: 0 6px 14px -10px rgba(0, 0, 0, 0.7);
+            transition: transform 0.15s ease, opacity 0.2s ease, border-color 0.2s ease;
+        }
+        .reset-quick-btn:hover {
+            opacity: 0.88;
+            transform: translateY(-1px);
+            border-color: var(--color-accent);
+        }
+        .reset-quick-btn:active {
+            transform: translateY(0);
+        }
+        .reset-quick-btn-danger {
+            background-color: var(--color-reset);
+            border-color: transparent;
+            color: #fff;
+        }
+        .reset-quick-btn-danger:hover {
+            border-color: transparent;
+        }
+
         /* Input and Textarea styling */
         .theme-input {
-            background-color: var(--bg-primary); 
+            background-color: var(--bg-primary);
             border-width: 1px;
             border-color: var(--color-border);
             color: var(--color-text);
         }
         .theme-input::placeholder { color: var(--color-text-subtle); }
-        
+
         /* Custom scrollbar for theme */
         body::-webkit-scrollbar { width: 8px; }
         body::-webkit-scrollbar-track { background: var(--bg-page); }
         body::-webkit-scrollbar-thumb { background: var(--bg-secondary); border-radius: 4px; }
         body::-webkit-scrollbar-thumb:hover { background: var(--color-text-subtle); }
-        
+
+        body[data-motion="off"] *,
+        body[data-motion="off"] *::before,
+        body[data-motion="off"] *::after {
+            animation: none !important;
+            transition: none !important;
+            scroll-behavior: auto !important;
+        }
+
         /* Drag and Drop Visuals */
         .drag-shadow {
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
@@ -1395,6 +1503,15 @@
         }
         .layout-edit-mode .layout-section:active {
             cursor: grabbing;
+        }
+        .layout-edit-mode .layout-section[data-section-id="character-list"] {
+            max-height: 58vh;
+            overflow: hidden;
+        }
+        .layout-edit-mode .layout-section[data-section-id="character-list"] #character-list {
+            max-height: calc(58vh - 72px);
+            overflow-y: auto;
+            padding-right: 4px;
         }
 
         /* Goal Completion Celebration */
@@ -1488,7 +1605,7 @@
             border-color: var(--color-pin-highlight);
             box-shadow: 0 4px 6px -1px rgba(var(--color-pin-shadow), 0.1), 0 2px 4px -2px rgba(var(--color-pin-shadow), 0.06);
         }
-        
+
     </style>
 </head>
 <body class="min-h-screen font-sans p-4 sm:p-8">
@@ -1503,19 +1620,19 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Notification Box -->
     <div id="notification-box" class="fixed bottom-4 right-4 p-3 rounded-lg shadow-xl text-white transition-all duration-300 transform translate-y-full opacity-0 z-50">
         <!-- Notification message will be inserted here -->
     </div>
 
     <div id="app-container" class="max-w-4xl mx-auto">
-        
+
         <!-- Header with Theme Toggle and View Toggle -->
         <header class="text-center mb-8 flex flex-col sm:flex-row justify-center sm:justify-between items-center relative">
-            
+
             <!-- View Toggle Button (NEW) -->
-            <button id="view-toggle-button" onclick="switchView('settlement')" 
+            <button id="view-toggle-button" onclick="switchView('settlement')"
                     class="order-2 sm:order-1 mt-4 sm:mt-0 px-4 py-2 bg-accent-blue text-white font-semibold rounded-lg hover:opacity-80 transition shadow-lg w-full sm:w-auto text-sm">
                 💰 정산표 보기
             </button>
@@ -1524,13 +1641,17 @@
                 <h1 class="text-4xl font-extrabold text-accent-blue mb-2">냥골 던전 숙제 트래커</h1>
                 <p class="text-subtle-theme">캐릭터별 주간/월간 클리어 횟수 및 보상 정산</p>
             </div>
-            
+
             <!-- Theme Toggle Button -->
             <button id="theme-toggle" onclick="toggleTheme()" class="order-3 absolute top-0 right-0 sm:static p-2 rounded-full bg-secondary-theme hover:opacity-80 transition shadow-lg text-2xl" title="테마 전환">
                 <span id="theme-icon">🌙</span>
             </button>
         </header>
-        <div class="mb-4 flex justify-end">
+        <div class="mb-4 flex justify-end gap-2">
+            <button id="motion-toggle" onclick="toggleMotionEffects()"
+                    class="px-4 py-2 bg-primary-theme border border-theme rounded-lg text-sm font-semibold hover:opacity-80 transition">
+                Animation ON
+            </button>
             <button id="layout-edit-toggle" onclick="toggleLayoutEditMode()"
                     class="px-4 py-2 bg-primary-theme border border-theme rounded-lg text-sm font-semibold hover:opacity-80 transition">
                 레이아웃 편집
@@ -1542,7 +1663,7 @@
             <p id="user-info" class="text-sm text-subtle-theme">데이터를 로드 중입니다...</p>
             <p class="text-xs text-blue-500 mt-1">※ 데이터는 현재 브라우저의 로컬 저장소에 저장되므로, 다른 브라우저에서는 접근할 수 없습니다.</p>
         </div>
-        
+
         <!-- --- TRACKER VIEW CONTENT --- -->
         <div id="tracker-view">
             <div id="tracker-sections" class="space-y-8">
@@ -1551,7 +1672,7 @@
                 <summary class="text-2xl font-bold cursor-pointer select-none">
                     📝 메모/자유 기록 (여기를 클릭하여 열고 닫기)
                 </summary>
-                <textarea id="memo-input" 
+                <textarea id="memo-input"
                             class="theme-input w-full h-32 mt-4 p-3 border rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none"
                             placeholder="여기에 자유롭게 메모를 입력하세요. (브라우저에 자동 저장됩니다.)"
                 ></textarea>
@@ -1561,9 +1682,9 @@
             <div class="layout-section mb-8 p-6 bg-secondary-theme rounded-xl shadow-lg border border-theme" data-section-id="add-character">
                 <h2 class="text-2xl font-bold mb-4">새 캐릭터 추가</h2>
                 <form id="add-char-form" class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
-                    <input 
-                        type="text" 
-                        id="char-name-input" 
+                    <input
+                        type="text"
+                        id="char-name-input"
                         placeholder="캐릭터 이름 (예: 사냐)"
                         required
                         class="theme-input flex-grow p-3 border rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none"
@@ -1573,13 +1694,21 @@
                     </button>
                 </form>
             </div>
-            
+
             <!-- Count Reset Section (Compact) -->
-            <div class="layout-section mb-8 p-3 bg-primary-theme rounded-xl shadow-lg border border-theme flex flex-col sm:flex-row items-center justify-between" data-section-id="reset">
-                <span class="text-sm font-semibold text-subtle-theme mb-2 sm:mb-0">전체 카운트 초기화 (주간/월간)</span>
-                <button id="reset-all-button" class="w-full sm:w-auto px-4 py-2 bg-accent-red text-white text-sm font-semibold rounded-lg hover:bg-red-600 transition shadow-lg">
-                    🔄 모두 리셋
-                </button>
+            <div class="layout-section mb-8 p-3 sm:p-4 bg-primary-theme rounded-xl shadow-lg border border-theme flex flex-col sm:flex-row items-center justify-between gap-3" data-section-id="reset">
+                <span class="text-sm font-semibold text-subtle-theme">전체 카운트 초기화</span>
+                <div class="flex items-center gap-2">
+                    <button id="reset-weekly-button" class="reset-quick-btn" title="주간 전체 초기화" aria-label="주간 전체 초기화">
+                        <span aria-hidden="true">&#8635;</span>
+                    </button>
+                    <button id="reset-monthly-button" class="reset-quick-btn" title="월간 전체 초기화" aria-label="월간 전체 초기화">
+                        <span aria-hidden="true">&#128197;</span>
+                    </button>
+                    <button id="reset-all-button" class="reset-quick-btn reset-quick-btn-danger" title="주간/월간 전체 초기화" aria-label="주간/월간 전체 초기화">
+                        <span aria-hidden="true">&#128472;</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Character List -->
@@ -1591,7 +1720,7 @@
             </section>
             </div>
         </div>
-        
+
         <!-- --- SETTLEMENT VIEW CONTENT (NEW) --- -->
         <div id="settlement-view" class="hidden">
             <h2 class="text-3xl font-extrabold mb-6 border-b border-theme pb-2 text-blue">💰 보상 정산표</h2>
