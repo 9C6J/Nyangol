@@ -24,7 +24,7 @@
             weekly: { divisor: 10, fragments: 50, feathers: 20 },
             monthly: { divisor: 30, fragments: 100 }
         };
-        const DEFAULT_PRICES = { fragmentPrice: 68000, featherPrice: 100000 };
+        const DEFAULT_PRICES = { fragmentPrice: 68000, featherPrice: 100000, clearGoldPrice: 180000 };
         const THEME_PRESETS = {
             dark: {
                 icon: '🌙',
@@ -757,6 +757,7 @@
         const calculateRewards = () => {
             let totalFragments = 0;
             let totalFeathers = 0;
+            let totalClearGold = 0;
             const rewardPerCharacter = [];
 
             characters.forEach(char => {
@@ -768,22 +769,29 @@
                 // Calculate batches for monthly rewards (30 per batch)
                 const monthlyBatches = Math.floor(char.monthlyCount / REWARD_RULES.monthly.divisor);
                 totalFragments += monthlyBatches * REWARD_RULES.monthly.fragments;
+                const clearGold = char.monthlyCount * itemPrices.clearGoldPrice;
+                totalClearGold += clearGold;
 
                 rewardPerCharacter.push({
                     name: char.name,
                     weeklyBatches: weeklyBatches,
                     monthlyBatches: monthlyBatches,
                     fragments: (weeklyBatches * REWARD_RULES.weekly.fragments) + (monthlyBatches * REWARD_RULES.monthly.fragments),
-                    feathers: weeklyBatches * REWARD_RULES.weekly.feathers
+                    feathers: weeklyBatches * REWARD_RULES.weekly.feathers,
+                    clearGold: clearGold
                 });
             });
 
             // Calculate total gold value
-            const totalGold = (totalFragments * itemPrices.fragmentPrice) + (totalFeathers * itemPrices.featherPrice);
+            const totalGold =
+                (totalFragments * itemPrices.fragmentPrice) +
+                (totalFeathers * itemPrices.featherPrice) +
+                totalClearGold;
 
             return {
                 totalFragments,
                 totalFeathers,
+                totalClearGold,
                 totalGold,
                 rewardPerCharacter
             };
@@ -808,7 +816,7 @@
                     <!-- 1. Price Input Section -->
                     <div class="bg-primary-theme p-6 rounded-xl shadow-inner border border-theme">
                         <h3 class="text-xl font-bold mb-4 text-accent-blue">💰 아이템 현재 가격 입력</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <!-- 봉힘파 가격 -->
                             <div class="flex flex-col">
                                 <label for="fragment-price" class="text-subtle-theme text-sm font-medium mb-1">봉인된 힘의 파편 (봉힘파) 개당 가격 (골드)</label>
@@ -827,13 +835,21 @@
                                     class="theme-input p-3 rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none text-xl font-bold"
                                     oninput="handlePriceChange('featherPrice', this.value)">
                             </div>
+                            <div class="flex flex-col">
+                                <label for="clear-gold-price" class="text-subtle-theme text-sm font-medium mb-1">클리어 골드 (월간 냥골 1회당)</label>
+                                <input type="number" id="clear-gold-price"
+                                    value="${itemPrices.clearGoldPrice}" min="0" step="1000"
+                                    placeholder="월간 냥골 1회당 골드"
+                                    class="theme-input p-3 rounded-lg focus:ring-accent-blue focus:border-accent-blue outline-none text-xl font-bold"
+                                    oninput="handlePriceChange('clearGoldPrice', this.value)">
+                            </div>
                         </div>
                     </div>
 
                     <!-- 2. Total Reward Summary -->
                     <div class="bg-secondary-theme p-6 rounded-xl shadow-lg border border-theme">
                         <h3 class="text-2xl font-bold mb-4">🏆 전체 정산 결과</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 text-center">
 
                             <!-- 총 봉힘파 -->
                             <div class="p-4 bg-primary-theme rounded-lg border border-theme">
@@ -845,6 +861,12 @@
                             <div class="p-4 bg-primary-theme rounded-lg border border-theme">
                                 <p class="text-subtle-theme text-sm">총 고강비 수량</p>
                                 <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalFeathers)}개</p>
+                            </div>
+
+                            <!-- 총 클리어 골드 -->
+                            <div class="p-4 bg-primary-theme rounded-lg border border-theme">
+                                <p class="text-subtle-theme text-sm">총 클리어 골드</p>
+                                <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalClearGold)}G</p>
                             </div>
 
                             <!-- 총 골드 가치 -->
@@ -869,7 +891,8 @@
                                         <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">주간 정산 횟수</th>
                                         <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">월간 정산 횟수</th>
                                         <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">봉힘파 총량</th>
-                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider rounded-tr-lg">고강비 총량</th>
+                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider">고강비 총량</th>
+                                        <th class="px-3 py-3 text-center text-xs font-medium text-subtle-theme uppercase tracking-wider rounded-tr-lg">클리어 골드</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-theme">
@@ -880,6 +903,7 @@
                                             <td class="px-3 py-4 whitespace-nowrap text-sm text-center">${char.monthlyBatches}회</td>
                                             <td class="px-3 py-4 whitespace-nowrap text-sm text-center font-semibold text-pin-highlight">${formatNumber(char.fragments)}</td>
                                             <td class="px-3 py-4 whitespace-nowrap text-sm text-center font-semibold text-pin-highlight">${formatNumber(char.feathers)}</td>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center font-semibold text-pin-highlight">${formatNumber(char.clearGold)}G</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -888,7 +912,7 @@
                         ` : `<p class="text-subtle-theme text-center p-4">등록된 캐릭터가 없어 정산할 수 없습니다.</p>`}
 
                         <p class="text-sm text-subtle-theme mt-4">
-                            정산 기준: 주간 10회 = 봉힘파 50 + 고강비 20 / 월간 30회 = 봉힘파 100
+                            정산 기준: 주간 10회 = 봉힘파 50 + 고강비 20 / 월간 30회 = 봉힘파 100 / 월간 냥골 1회 = 클리어 골드 입력값
                         </p>
                     </div>
                 </div>
