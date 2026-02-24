@@ -21,8 +21,8 @@
 
         // Reward Rules
         const REWARD_RULES = {
-            weekly: { divisor: 10, fragments: 50, feathers: 20 },
-            monthly: { divisor: 30, fragments: 100 }
+            weekly: { divisor: 10, fragments: 50, feathers: 10 },
+            monthly: { divisor: 30, fragments: 100, feathers: 30 }
         };
         const DEFAULT_PRICES = { fragmentPrice: 68000, featherPrice: 100000, clearGoldPrice: 180000 };
         const THEME_PRESETS = {
@@ -766,9 +766,10 @@
                 totalFragments += weeklyBatches * REWARD_RULES.weekly.fragments;
                 totalFeathers += weeklyBatches * REWARD_RULES.weekly.feathers;
 
-                // Calculate batches for monthly rewards (30 per batch)
-                const monthlyBatches = Math.floor(char.monthlyCount / REWARD_RULES.monthly.divisor);
+                // Calculate batches for monthly rewards (30 per batch, max 1 batch)
+                const monthlyBatches = Math.min(1, Math.floor(char.monthlyCount / REWARD_RULES.monthly.divisor));
                 totalFragments += monthlyBatches * REWARD_RULES.monthly.fragments;
+                totalFeathers += monthlyBatches * REWARD_RULES.monthly.feathers;
                 const clearGold = char.monthlyCount * itemPrices.clearGoldPrice;
                 totalClearGold += clearGold;
 
@@ -777,7 +778,7 @@
                     weeklyBatches: weeklyBatches,
                     monthlyBatches: monthlyBatches,
                     fragments: (weeklyBatches * REWARD_RULES.weekly.fragments) + (monthlyBatches * REWARD_RULES.monthly.fragments),
-                    feathers: weeklyBatches * REWARD_RULES.weekly.feathers,
+                    feathers: (weeklyBatches * REWARD_RULES.weekly.feathers) + (monthlyBatches * REWARD_RULES.monthly.feathers),
                     clearGold: clearGold
                 });
             });
@@ -847,29 +848,38 @@
                     </div>
 
                     <!-- 2. Total Reward Summary -->
+                    <div id="settlement-results"></div>
+
+                    <!-- 3. Character Breakdown Table -->
+                    <div id="settlement-table"></div>
+                </div>
+            `;
+            updateSettlementResults();
+        };
+
+        const updateSettlementResults = () => {
+            const resultsContainer = document.getElementById('settlement-results');
+            const tableContainer = document.getElementById('settlement-table');
+            if (!resultsContainer || !tableContainer) return;
+
+            const rewards = calculateRewards();
+
+            resultsContainer.innerHTML = `
                     <div class="bg-secondary-theme p-6 rounded-xl shadow-lg border border-theme">
                         <h3 class="text-2xl font-bold mb-4">🏆 전체 정산 결과</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 text-center">
-
-                            <!-- 총 봉힘파 -->
                             <div class="p-4 bg-primary-theme rounded-lg border border-theme">
                                 <p class="text-subtle-theme text-sm">총 봉힘파 수량</p>
                                 <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalFragments)}개</p>
                             </div>
-
-                            <!-- 총 고강비 -->
                             <div class="p-4 bg-primary-theme rounded-lg border border-theme">
                                 <p class="text-subtle-theme text-sm">총 고강비 수량</p>
                                 <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalFeathers)}개</p>
                             </div>
-
-                            <!-- 총 클리어 골드 -->
                             <div class="p-4 bg-primary-theme rounded-lg border border-theme">
                                 <p class="text-subtle-theme text-sm">총 클리어 골드</p>
                                 <p class="text-3xl font-extrabold text-pin-highlight">${formatNumber(rewards.totalClearGold)}G</p>
                             </div>
-
-                            <!-- 총 골드 가치 -->
                             <div class="p-4 bg-primary-theme rounded-lg border border-theme col-span-1 sm:col-span-1">
                                 <p class="text-subtle-theme text-sm">총 예상 골드 가치</p>
                                 <p class="text-3xl font-extrabold text-green-500">${formatNumber(rewards.totalGold)}G</p>
@@ -877,11 +887,11 @@
                         </div>
                         <p class="text-xs text-subtle-theme mt-4">* 이 금액은 입력된 아이템 가격에 기반한 예상치입니다.</p>
                     </div>
+            `;
 
-                    <!-- 3. Character Breakdown Table -->
+            tableContainer.innerHTML = `
                     <div class="bg-primary-theme p-6 rounded-xl shadow-lg border border-theme">
                         <h3 class="text-2xl font-bold mb-4">캐릭터별 상세 정산</h3>
-
                         ${rewards.rewardPerCharacter.length > 0 ? `
                         <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-theme">
@@ -910,12 +920,10 @@
                             </table>
                         </div>
                         ` : `<p class="text-subtle-theme text-center p-4">등록된 캐릭터가 없어 정산할 수 없습니다.</p>`}
-
                         <p class="text-sm text-subtle-theme mt-4">
-                            정산 기준: 주간 10회 = 봉힘파 50 + 고강비 20 / 월간 30회 = 봉힘파 100 / 월간 냥골 1회 = 클리어 골드 입력값
+                            정산 기준: 주간 10회 = 봉힘파 50 + 고강비 10 / 월간 30회 = 봉힘파 100 + 고강비 30 / 월간 냥골 1회 = 클리어 골드 입력값
                         </p>
                     </div>
-                </div>
             `;
         };
 
@@ -923,7 +931,11 @@
         window.handlePriceChange = (key, value) => {
             const numValue = parseInt(value, 10);
             itemPrices[key] = isNaN(numValue) || numValue < 0 ? 0 : numValue;
-            savePrices(); // Save the new price and re-render settlement view
+            localStorage.setItem(PRICE_KEY, JSON.stringify(itemPrices));
+            // Update only the results section without re-rendering inputs
+            if (currentView === 'settlement') {
+                updateSettlementResults();
+            }
         };
 
         // --- Data Manipulation Functions ---
@@ -978,7 +990,6 @@
             }
 
             const data = characters[charIndex];
-            const MONTHLY_CAP = REWARD_RULES.monthly.divisor;
             const previousWeeklyCount = data.weeklyCount;
             const previousMonthlyCount = data.monthlyCount;
             let updated = false;
@@ -986,13 +997,8 @@
             if (fieldName === 'weeklyCount') {
                 if (action === 'increment') {
                     data.weeklyCount += 1;
+                    data.monthlyCount += 1;
                     updated = true;
-
-                    if (data.monthlyCount < MONTHLY_CAP) {
-                        data.monthlyCount = Math.min(data.monthlyCount + 1, MONTHLY_CAP);
-                    } else if (data.monthlyCount === MONTHLY_CAP && data.weeklyCount === 1) {
-                        showNotification(`월간 냥골 카운트가 최대치(${MONTHLY_CAP})에 도달했습니다.`, 'info');
-                    }
                 } else if (action === 'decrement') {
                     if (data.weeklyCount > 0) {
                         data.weeklyCount -= 1;
@@ -1010,16 +1016,8 @@
                 }
             } else if (fieldName === 'monthlyCount') {
                 if (action === 'increment') {
-                    const newMonthlyCount = Math.min(data.monthlyCount + 1, MONTHLY_CAP);
-
-                    if (newMonthlyCount !== data.monthlyCount) {
-                        data.monthlyCount = newMonthlyCount;
-                        updated = true;
-
-                        if (newMonthlyCount === MONTHLY_CAP) {
-                            showNotification(`월간 냥골 카운트가 최대치(${MONTHLY_CAP})에 도달했습니다.`, 'info');
-                        }
-                    }
+                    data.monthlyCount += 1;
+                    updated = true;
                 } else if (action === 'decrement') {
                     if (data.monthlyCount > 0) {
                         data.monthlyCount -= 1;
